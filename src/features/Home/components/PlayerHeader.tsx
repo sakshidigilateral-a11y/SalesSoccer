@@ -410,7 +410,6 @@ const PlayerHeader = () => {
               style={styles.jerseyLogo}
             />
           )}
-
           <Text
             variant="header"
             fontSize={10}
@@ -426,7 +425,7 @@ const PlayerHeader = () => {
           </Text>
         </Box>
       </Box>
-
+      
       <LinearGradient
         colors={['#c997ba99', '#c593b899', '#c293b499']}
         start={{x: 0, y: 0}}
