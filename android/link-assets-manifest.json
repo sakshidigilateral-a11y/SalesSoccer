@@ -1,0 +1,41 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "src/assets/fonts/Orbitron/OFL.txt",
+      "sha1": "6977a0b6d1b11bff2c36fd099c62a11c3b94e582"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/Orbitron-VariableFont_wght.ttf",
+      "sha1": "1f13abb00f097178cda113ec970e8ad01e62c584"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/README.txt",
+      "sha1": "467418180c7809c2e7cd97d6255b5cac74d400e9"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/static/Orbitron-Black.ttf",
+      "sha1": "466c7565b40f328e604ee0a91913cabb8f9a05dc"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/static/Orbitron-Bold.ttf",
+      "sha1": "216014e8feaf538874f86d970a8c821e094109e7"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/static/Orbitron-ExtraBold.ttf",
+      "sha1": "44ed139f1dc77c6c599e3b2b6b5f0f19bd23ccaa"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/static/Orbitron-Medium.ttf",
+      "sha1": "7816f6522ae3b38b22eedcc548b2e74b33b63b9a"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/static/Orbitron-Regular.ttf",
+      "sha1": "9d73a88e5582667c7f2289c57548fee6833e611a"
+    },
+    {
+      "path": "src/assets/fonts/Orbitron/static/Orbitron-SemiBold.ttf",
+      "sha1": "2c6d65b07dd0bf7a8794756f61332de0f0e4ac4d"
+    }
+  ]
+}
