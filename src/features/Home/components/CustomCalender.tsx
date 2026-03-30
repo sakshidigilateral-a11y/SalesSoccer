@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useRef, useCallback, useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,22 @@ import {
   StyleSheet,
   Dimensions,
   FlatList,
+  ViewToken,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AntdesignIcon from 'react-native-vector-icons/AntDesign';
+import WheelScrollPicker from 'react-native-wheel-scrollview-picker';
 
 const {width} = Dimensions.get('window');
+
+const CALENDAR_WIDTH = width * 0.88;
+const GRID_PADDING = 8;
+const CELL_SIZE = Math.floor((CALENDAR_WIDTH - GRID_PADDING * 2) / 7);
+
+const ITEM_HEIGHT = 48;
+const VISIBLE_ITEMS = 7; // must be odd — centre row = selected
+const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
+const SPACER_COUNT = Math.floor(VISIBLE_ITEMS / 2); // items to pad top & bottom
 
 interface CustomCalendarProps {
   visible: boolean;
@@ -21,6 +32,111 @@ interface CustomCalendarProps {
   minDate?: Date;
 }
 
+// ─── DrumPicker ──────────────────────────────────────────────────────────────
+// Uses FlatList with getItemLayout + snapToInterval for pixel-perfect snapping.
+// onViewableItemsChanged fires reliably mid-scroll to track the centred item,
+// completely eliminating the double-fire / jump glitch of onScrollEnd.
+interface DrumPickerProps {
+  data: string[];
+  selectedIndex: number;
+  onIndexChange: (idx: number) => void;
+  keyPrefix: string;
+} 
+
+const VIEWABILITY_CONFIG = {
+  itemVisiblePercentThreshold: 60,
+};
+
+const DrumPicker = ({data, selectedIndex, onIndexChange}: DrumPickerProps) => {
+  return (
+    <View style={{height: PICKER_HEIGHT, justifyContent: 'center'}}>
+      <WheelScrollPicker
+        dataSource={data}
+        selectedIndex={selectedIndex}
+        onValueChange={(data, index) => onIndexChange(index)}
+        wrapperHeight={PICKER_HEIGHT}
+        wrapperWidth={150}
+        itemHeight={ITEM_HEIGHT}
+        highlightColor="rgba(255,0,200,0.25)"
+        highlightBorderWidth={2}
+        wrapperBackground="transparent"
+        itemBackground="transparent"
+        renderItem={(data, index, isSelected) => {
+          return (
+            <View
+              style={{
+                height: ITEM_HEIGHT,
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <Text
+                style={{
+                  color: isSelected ? '#fff' : '#000',
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                }}>
+                {data}
+              </Text>
+            </View>
+          );
+        }}
+      />
+    </View>
+  );
+};
+
+const drumStyles = StyleSheet.create({
+  wrapper: {
+    height: PICKER_HEIGHT,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  item: {
+    height: ITEM_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  itemText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  itemTextSelected: {
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    color: '#fff',
+  },
+  band: {
+    position: 'absolute',
+    top: ITEM_HEIGHT * SPACER_COUNT,
+    left: 10,
+    right: 10,
+    height: ITEM_HEIGHT,
+    borderTopWidth: 1.5,
+    borderBottomWidth: 1.5,
+    borderColor: 'rgba(255, 0, 220, 0.75)',
+    backgroundColor: 'rgba(255, 0, 200, 0.1)',
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  mask: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: ITEM_HEIGHT * SPACER_COUNT,
+    zIndex: 9,
+  },
+  maskTop: {
+    // backgroundColor: 'rgba(60, 0, 110, 0.55)',
+  },
+  maskBottom: {
+    //backgroundColor: 'rgba(173, 114, 221, 0.55)',
+  },
+});
+
+// ─── Main Calendar ────────────────────────────────────────────────────────────
 const CustomCalendar = ({
   visible,
   onClose,
@@ -29,65 +145,86 @@ const CustomCalendar = ({
   minDate,
 }: CustomCalendarProps) => {
   const today = new Date();
+
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [picked, setPicked] = useState<Date | null>(null);
-  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [view, setView] = useState<'calendar' | 'picker'>('calendar');
+
+  useEffect(() => {
+    if (visible) {
+      const today = new Date();
+      setPicked(today);
+      setViewYear(today.getFullYear());
+      setViewMonth(today.getMonth());
+    }
+  }, [visible]);
 
   const MONTHS = [
-    'January', 'February', 'March', 'April',
-    'May', 'June', 'July', 'August',
-    'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
-  const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-  const maxYear = maxDate.getFullYear();
-  const minYear = minDate ? minDate.getFullYear() : maxYear - 100;
+  const currentYear = new Date().getFullYear();
+  const minYear = minDate ? minDate.getFullYear() : currentYear - 100;
+  const maxYear = currentYear; // only till current year
+
   const years = Array.from(
     {length: maxYear - minYear + 1},
-    (_, i) => maxYear - i,
+    (_, i) => minYear + i,
   );
+  const yearIndex = Math.max(0, years.indexOf(viewYear));
 
   const getDaysInMonth = (y: number, m: number) =>
     new Date(y, m + 1, 0).getDate();
-  const getFirstDay = (y: number, m: number) =>
-    new Date(y, m, 1).getDay();
+  const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay();
 
   const prevMonth = () => {
-    if (viewMonth === 0) {
-      setViewMonth(11);
-      setViewYear(y => y - 1);
-    } else {
-      setViewMonth(m => m - 1);
+    const newDate = new Date(viewYear, viewMonth - 1, 1);
+
+    if (
+      minDate &&
+      newDate < new Date(minDate.getFullYear(), minDate.getMonth(), 1)
+    ) {
+      return;
     }
+
+    setViewYear(newDate.getFullYear());
+    setViewMonth(newDate.getMonth());
   };
 
   const nextMonth = () => {
-    const next = new Date(viewYear, viewMonth + 1, 1);
-    if (next > maxDate) return;
-    if (viewMonth === 11) {
-      setViewMonth(0);
-      setViewYear(y => y + 1);
-    } else {
-      setViewMonth(m => m + 1);
+    const newDate = new Date(viewYear, viewMonth + 1, 1);
+
+    if (newDate > maxDate) {
+      return;
     }
+
+    setViewYear(newDate.getFullYear());
+    setViewMonth(newDate.getMonth());
   };
 
   const isDisabled = (day: number) => {
     const d = new Date(viewYear, viewMonth, day);
-    const tooLate = d > maxDate;
-    const tooEarly = minDate ? d < minDate : false;
-    return tooLate || tooEarly;
+    return d > maxDate || (minDate ? d < minDate : false);
   };
 
-  const isPicked = (day: number) => {
-    if (!picked) return false;
-    return (
-      picked.getDate() === day &&
-      picked.getMonth() === viewMonth &&
-      picked.getFullYear() === viewYear
-    );
-  };
+  const isPicked = (day: number) =>
+    !!picked &&
+    picked.getDate() === day &&
+    picked.getMonth() === viewMonth &&
+    picked.getFullYear() === viewYear;
 
   const isToday = (day: number) =>
     today.getDate() === day &&
@@ -96,14 +233,18 @@ const CustomCalendar = ({
 
   const totalDays = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDay(viewYear, viewMonth);
-  const cells: (number | null)[] = Array(firstDay)
-    .fill(null)
-    .concat(Array.from({length: totalDays}, (_, i) => i + 1));
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({length: totalDays}, (_, i) => i + 1),
+  ];
   while (cells.length % 7 !== 0) cells.push(null);
+  const rows = Array.from({length: cells.length / 7}, (_, i) =>
+    cells.slice(i * 7, i * 7 + 7),
+  );
 
   const handleClose = () => {
     setPicked(null);
-    setShowYearPicker(false);
+    setView('calendar');
     onClose();
   };
 
@@ -113,80 +254,84 @@ const CustomCalendar = ({
     handleClose();
   };
 
-  // ── PICKED DATE LABEL ─────────────────────────────────────────
-  // ✅ FIX: Build label string safely — no text outside <Text>
   const getPickedLabel = (): string => {
     if (!picked) return 'Select a date';
-    const dayName = DAYS[new Date(picked).getDay()];
-    const dayNum = picked.getDate();
-    const monthName = MONTHS[picked.getMonth()].slice(0, 3);
-    return `${dayName}, ${dayNum} ${monthName}`;
+    return `${DAYS[picked.getDay()]}, ${picked.getDate()} ${MONTHS[
+      picked.getMonth()
+    ].slice(0, 3)}`;
   };
 
-  // ── YEAR PICKER VIEW ──────────────────────────────────────────
-  const renderYearPicker = () => (
-    <View style={styles.yearPickerWrapper}>
+  // ── DRUM PICKER VIEW ──────────────────────────────────────────
+  const renderPicker = () => (
+    <LinearGradient
+      colors={['#6a0dad', '#c700a6']}
+      start={{x: 0, y: 0}}
+      end={{x: 1, y: 1}}
+      style={styles.container}>
       <LinearGradient
-        colors={['#6a0dad', '#4a0080']}
-        style={styles.yearPickerBox}>
+        colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
+        style={styles.header}>
+        <Text style={styles.headerYear}>{String(viewYear)}</Text>
+        <Text style={styles.headerDate}>{getPickedLabel()}</Text>
+      </LinearGradient>
 
-        {/* Header */}
-        <View style={styles.yearPickerHeader}>
-          {/* ✅ FIX: Text always inside <Text> component */}
-          <Text style={styles.yearPickerTitle}>{'Select Year'}</Text>
-          <TouchableOpacity
-            onPress={() => setShowYearPicker(false)}
-            accessible={true}
-            accessibilityLabel="Close year picker"
-            accessibilityRole="button">
-            {/* ✅ FIX: Icon wrapped in View — no inline style on icon */}
-            <View style={styles.iconWrapper}>
-              <AntdesignIcon name="close" size={18} color="#fff" />
-            </View>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.pickerLabels}>
+        <Text style={styles.pickerLabelText}>{'MONTH'}</Text>
+        <Text style={styles.pickerLabelText}>{'YEAR'}</Text>
+      </View>
 
-        {/* Year List */}
-        <FlatList
-          data={years}
-          keyExtractor={item => item.toString()}
-          showsVerticalScrollIndicator={false}
-          getItemLayout={(_, index) => ({
-            length: 48,
-            offset: 48 * index,
-            index,
-          })}
-          initialScrollIndex={Math.max(0, years.indexOf(viewYear))}
-          renderItem={({item}) => {
-            const isSelected = item === viewYear;
-            return (
-              <TouchableOpacity
-                onPress={() => {
-                  setViewYear(item);
-                  setShowYearPicker(false);
-                }}
-                style={[
-                  styles.yearItem,
-                  isSelected && styles.yearItemSelected,
-                ]}
-                accessible={true}
-                accessibilityLabel={`Year ${item}`}
-                accessibilityRole="button"
-                accessibilityState={{selected: isSelected}}>
-                {/* ✅ FIX: item is number — must be String() inside <Text> */}
-                <Text
-                  style={[
-                    styles.yearItemText,
-                    isSelected && styles.yearItemTextSelected,
-                  ]}>
-                  {String(item)}
-                </Text>
-              </TouchableOpacity>
-            );
+      <View style={styles.pickerRow}>
+        <View
+          style={{
+            position: 'absolute',
+            left: 10,
+            right: 10,
+            top: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2,
+            height: ITEM_HEIGHT,
+            borderTopWidth: 1.5,
+            borderBottomWidth: 1.5,
+            borderColor: 'rgba(255,0,200,0.8)',
           }}
         />
-      </LinearGradient>
-    </View>
+        <LinearGradient
+          colors={['#6a0dad', '#c700a6']}
+          style={styles.pickerCol}>
+          <DrumPicker
+            keyPrefix="month"
+            data={MONTHS}
+            selectedIndex={viewMonth}
+            onIndexChange={idx => setViewMonth(idx)}
+          />
+        </LinearGradient>
+        <View style={styles.pickerDivider} />
+        <LinearGradient
+          colors={['#6a0dad', '#c700a6']}
+          style={styles.pickerCol}>
+          <DrumPicker
+            data={years.map(String)}
+            selectedIndex={yearIndex}
+            onIndexChange={idx => {
+              if (years[idx] <= currentYear) {
+                setViewYear(years[idx]);
+              }
+            }}
+          />
+        </LinearGradient>
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
+          onPress={() => setView('calendar')}
+          style={styles.cancelBtn}>
+          <Text style={styles.cancelText}>{'BACK'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => setView('calendar')}
+          style={styles.okBtn}>
+          <Text style={styles.okText}>{'DONE'}</Text>
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
   );
 
   // ── CALENDAR VIEW ─────────────────────────────────────────────
@@ -196,145 +341,102 @@ const CustomCalendar = ({
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
       style={styles.container}>
-
-      {/* ── HEADER ── */}
       <LinearGradient
         colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)']}
         style={styles.header}>
-        {/* ✅ FIX: viewYear is number — String() ensures safe render */}
         <Text style={styles.headerYear}>{String(viewYear)}</Text>
         <Text style={styles.headerDate}>{getPickedLabel()}</Text>
       </LinearGradient>
 
-      {/* ── MONTH NAV ── */}
       <View style={styles.nav}>
-
-        {/* Prev */}
-        <TouchableOpacity
-          onPress={prevMonth}
-          style={styles.navBtn}
-          accessible={true}
-          accessibilityLabel="Previous month"
-          accessibilityRole="button">
+        <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
           <View style={styles.iconWrapper}>
             <AntdesignIcon name="left" size={16} color="#ff00ea" />
           </View>
         </TouchableOpacity>
 
-        {/* Month + Year label — tappable to open year picker */}
         <TouchableOpacity
-          onPress={() => setShowYearPicker(true)}
           style={styles.navMonthBtn}
-          accessible={true}
-          accessibilityLabel={`${MONTHS[viewMonth]} ${viewYear}, tap to select year`}
-          accessibilityRole="button">
-          {/* ✅ FIX: All text in one <Text>, no mixed children */}
+          onPress={() => {
+            setView('picker');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Open month and year picker">
           <Text style={styles.navMonth}>
-            {`${MONTHS[viewMonth]} ${String(viewYear)}`}
+            {MONTHS[viewMonth]} {viewYear}
           </Text>
-          {/* ✅ FIX: Icon in its own View, no style prop on icon directly */}
-          <View style={styles.caretWrapper}>
-            <AntdesignIcon name="caretdown" size={10} color="#ff00b7" />
+          <View style={[styles.iconWrapper, {marginLeft: 5}]}>
+            <AntdesignIcon name="caretdown" size={9} color="#ff00ee" />
           </View>
         </TouchableOpacity>
 
-        {/* Next */}
-        <TouchableOpacity
-          onPress={nextMonth}
-          style={styles.navBtn}
-          accessible={true}
-          accessibilityLabel="Next month"
-          accessibilityRole="button">
+        <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
           <View style={styles.iconWrapper}>
             <AntdesignIcon name="right" size={16} color="#ff00fb" />
           </View>
         </TouchableOpacity>
-
       </View>
 
-      {/* ── DAY LABELS ── */}
       <View style={styles.weekRow}>
         {DAYS.map(d => (
-          // ✅ FIX: Each day label is a plain string in its own <Text>
-          <Text key={d} style={styles.weekLabel}>
-            {d}
-          </Text>
+          <View key={d} style={styles.cell}>
+            <Text style={styles.weekLabel}>{d}</Text>
+          </View>
         ))}
       </View>
 
-      {/* ── GRID ── */}
       <View style={styles.grid}>
-        {cells.map((day, idx) => {
-          if (day === null) {
-            return <View key={`empty-${idx}`} style={styles.cell} />;
-          }
-          const disabled = isDisabled(day);
-          const selected = isPicked(day);
-          const todayCell = isToday(day);
-          return (
-            <TouchableOpacity
-              key={`day-${idx}`}
-              style={styles.cell}
-              disabled={disabled}
-              onPress={() => setPicked(new Date(viewYear, viewMonth, day))}
-              accessible={true}
-              accessibilityLabel={
-                `${String(day)} ${MONTHS[viewMonth]} ${String(viewYear)}` +
-                (todayCell ? ', today' : '')
-              }
-              accessibilityRole="button"
-              accessibilityState={{
-                disabled: disabled,
-                selected: selected,
-              }}>
-              <View
-                style={[
-                  styles.dayCircle,
-                  selected && styles.selectedCircle,
-                  todayCell && !selected && styles.todayCircle,
-                ]}>
-                {/* ✅ FIX: day is number — String() prevents "text not in Text" */}
-                <Text
-                  style={[
-                    styles.dayText,
-                    disabled && styles.disabledText,
-                    selected && styles.selectedText,
-                    todayCell && !selected && styles.todayText,
-                  ]}>
-                  {String(day)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+        {rows.map((row, rIdx) => (
+          <View key={`r${rIdx}`} style={styles.gridRow}>
+            {row.map((day, cIdx) => {
+              if (day === null)
+                return <View key={`e${rIdx}${cIdx}`} style={styles.cell} />;
+              const disabled = isDisabled(day);
+              const selected = isPicked(day);
+              const todayCell = isToday(day);
+              return (
+                <TouchableOpacity
+                  key={`d${rIdx}${cIdx}`}
+                  style={styles.cell}
+                  disabled={disabled}
+                  onPress={() => setPicked(new Date(viewYear, viewMonth, day))}>
+                  <View
+                    style={[
+                      styles.dayCircle,
+                      selected && styles.selectedCircle,
+                      todayCell && !selected && styles.todayCircle,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.dayText,
+                        disabled && styles.disabledText,
+                        selected && styles.selectedText,
+                        todayCell && !selected && styles.todayText,
+                      ]}>
+                      {String(day)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ))}
       </View>
 
-      {/* ── FOOTER ── */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          onPress={handleClose}
-          style={styles.cancelBtn}
-          accessible={true}
-          accessibilityLabel="Cancel"
-          accessibilityRole="button">
+        <TouchableOpacity onPress={handleClose} style={styles.cancelBtn}>
           <Text style={styles.cancelText}>{'CANCEL'}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleConfirm}
           style={[styles.okBtn, !picked && {opacity: 0.4}]}
-          disabled={!picked}
-          accessible={true}
-          accessibilityLabel="Confirm selected date"
-          accessibilityRole="button"
-          accessibilityState={{disabled: !picked}}>
+          disabled={!picked}>
           <Text style={styles.okText}>{'OK'}</Text>
         </TouchableOpacity>
       </View>
-
     </LinearGradient>
   );
 
-  // ── SINGLE MODAL ──────────────────────────────────────────────
   return (
     <Modal
       visible={visible}
@@ -342,7 +444,7 @@ const CustomCalendar = ({
       animationType="fade"
       onRequestClose={handleClose}>
       <View style={styles.overlay}>
-        {showYearPicker ? renderYearPicker() : renderCalendar()}
+        {view === 'picker' ? renderPicker() : renderCalendar()}
       </View>
     </Modal>
   );
@@ -358,19 +460,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   container: {
-    width: width * 0.88,
+    width: CALENDAR_WIDTH,
     borderRadius: 16,
     overflow: 'hidden',
     elevation: 10,
   },
-
-  // ── Header ──
-  header: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
+  header: {paddingHorizontal: 20, paddingVertical: 18},
   headerYear: {
-    color: 'rgba(255,255,255,0.7)',
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
     letterSpacing: 1,
@@ -381,8 +478,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 2,
   },
-
-  // ── Nav ──
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -392,12 +487,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  navBtn: {
-    padding: 6,
-  },
+  navBtn: {padding: 6},
   navMonthBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   navMonth: {
     color: '#ff00ee',
@@ -405,46 +502,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-  // ✅ Caret icon sits in its own View with marginLeft
-  caretWrapper: {
-    marginLeft: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // ✅ Generic icon wrapper — replaces inline style on AntdesignIcon
-  iconWrapper: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Week Labels ──
+  iconWrapper: {justifyContent: 'center', alignItems: 'center'},
   weekRow: {
     flexDirection: 'row',
-    paddingHorizontal: 8,
+    paddingHorizontal: GRID_PADDING,
     paddingTop: 10,
     paddingBottom: 4,
   },
   weekLabel: {
-    flex: 1,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
     textAlign: 'center',
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 11,
-    fontWeight: '600',
   },
-
-  // ── Grid ──
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 8,
+    paddingHorizontal: GRID_PADDING,
     paddingBottom: 8,
+    minHeight: CELL_SIZE * 7, // always space for 6 rows
   },
+  gridRow: {flexDirection: 'row'},
   cell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
+    width: CELL_SIZE,
+    height: CELL_SIZE,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 2,
   },
   dayCircle: {
     width: 34,
@@ -453,31 +534,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  selectedCircle: {
-    backgroundColor: '#ff00c8',
-  },
-  todayCircle: {
-    borderWidth: 1.5,
-    borderColor: '#ff00c3',
-  },
-  dayText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  disabledText: {
-    color: 'rgba(255,255,255,0.2)',
-  },
-  selectedText: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  todayText: {
-    color: '#ff00e1',
-    fontWeight: 'bold',
-  },
-
-  // ── Footer ──
+  selectedCircle: {backgroundColor: '#ff00c8'},
+  todayCircle: {borderWidth: 1.5, borderColor: '#ff00c3'},
+  dayText: {color: '#fff', fontSize: 13, fontWeight: '500'},
+  disabledText: {color: 'rgba(255,255,255,0.2)'},
+  selectedText: {color: '#000', fontWeight: 'bold'},
+  todayText: {color: '#ff00e1', fontWeight: 'bold'},
   footer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -487,68 +549,43 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  cancelBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-  },
+  cancelBtn: {paddingVertical: 8, paddingHorizontal: 20},
   cancelText: {
-    color: '#ff00bf',
+    color: '#e699d5',
     fontWeight: '700',
     fontSize: 13,
     letterSpacing: 0.5,
   },
-  okBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-  },
+  okBtn: {paddingVertical: 8, paddingHorizontal: 20},
   okText: {
-    color: '#ff00c8',
+    color: '#e699d5',
     fontWeight: '700',
     fontSize: 13,
     letterSpacing: 0.5,
   },
-
-  // ── Year Picker ──
-  yearPickerWrapper: {
-    width: width * 0.65,
-    maxHeight: 380,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 10,
-  },
-  yearPickerBox: {
-    flex: 1,
-  },
-  yearPickerHeader: {
+  pickerLabels: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 2,
   },
-  yearPickerTitle: {
-    color: '#ff00c3',
-    fontSize: 15,
+  pickerLabelText: {
+    flex: 1,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 10,
     fontWeight: '700',
+    letterSpacing: 2,
   },
-  yearItem: {
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
+  pickerRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
-  yearItemSelected: {
-    backgroundColor: '#ff00a2',
-  },
-  yearItemText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  yearItemTextSelected: {
-    color: '#000',
-    fontWeight: 'bold',
+  pickerCol: {flex: 1},
+  pickerDivider: {
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    marginVertical: 12,
   },
 });

@@ -1,6 +1,8 @@
 package com.rxsoccer
 
 import android.os.Bundle // 1. Added this import
+import android.view.WindowManager
+import android.graphics.Color
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -11,6 +13,9 @@ class MainActivity : ReactActivity() {
   // 2. Added this function inside the class
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null)
+    window.statusBarColor = Color.parseColor("#3a0050")
+    window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+    window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
   }
 
   /**
@@ -26,3 +31,4 @@ class MainActivity : ReactActivity() {
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 }
+

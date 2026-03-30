@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -21,15 +21,19 @@ import AntdesignIcon from 'react-native-vector-icons/AntDesign';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import * as RNFS from 'react-native-fs';
 import {Assets} from '../../assets/images';
-import {Linking, ScrollView} from 'react-native';
+import {Linking, ScrollView, Platform, StatusBar} from 'react-native';
 import {useDispatch} from 'react-redux';
 import {logout} from '../../redux/authSlice';
 import {persistor} from '../../redux/store';
 import {Alert} from 'react-native';
 import CustomCalendar from '../Home/components/CustomCalender';
 import {clearPlayerStats} from '../../redux/playerSlice';
+import ImageViewer from 'react-native-image-zoom-viewer';
+import AppStatusBar from '../Home/components/AppStatusBar';
 
 const {width} = Dimensions.get('window');
+// AFTER
+
 const API_URL = 'https://salessoccer.digilateral.com';
 
 export default function Action({navigation}) {
@@ -42,6 +46,10 @@ export default function Action({navigation}) {
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   const [teamLogos, setTeamLogos] = useState({});
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const flatListRef = useRef(null);
+  const lastTapRef2 = useRef(0);
   // Approval Modal States
   const [modalVisibleApproval, setModalVisibleApproval] = useState(false);
   const [modalVisibleSuccess, setModalVisibleSuccess] = useState(false);
@@ -52,6 +60,10 @@ export default function Action({navigation}) {
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  // AFTER existing state declarations
+  // const [zoomScale, setZoomScale] = useState(1);
+  // const [zoomOffset, setZoomOffset] = useState({x: 0, y: 0});
+  // const [lastScale, setLastScale] = useState(1);
 
   useEffect(() => {
     const getFormattedDate = () => {
@@ -74,6 +86,42 @@ export default function Action({navigation}) {
     }
   }, [selectedDate, userType]);
 
+  const resetDate = () => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    setSelectedDate(`${day}-${month}-${year}`);
+  };
+
+  const getTodayString = () => {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  const isDefaultDate = selectedDate === getTodayString();
+
+  const MONTH_NAMES = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  const formatDateDisplay = (dateStr: string): string => {
+    const [day, month, year] = dateStr.split('-');
+    return `${day}-${MONTH_NAMES[parseInt(month, 10) - 1]}-${year}`;
+  };
   const fetchUserDetails = async () => {
     try {
       const details = await AsyncStorage.getItem('userData');
@@ -159,10 +207,19 @@ export default function Action({navigation}) {
     setRefreshing(false);
   }, [selectedDate, userType]);
 
-  const toggleReply = id => {
-    setActiveCaseNo(prev => (prev === id ? null : id));
+  const toggleReply = (id, index) => {
+    setActiveCaseNo(prev => {
+      if (prev === id) return null;
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0,
+        });
+      }, 100);
+      return id;
+    });
   };
-
   const showDatePicker = () => setDatePickerVisibility(true);
   const hideDatePicker = () => setDatePickerVisibility(false);
 
@@ -299,7 +356,7 @@ export default function Action({navigation}) {
     }
   };
 
-  const renderItem = ({item}) => {
+  const renderItem = ({item, index}) => {
     console.log('ROLE:', userType);
     console.log('STATUS:', item.status);
     return (
@@ -360,7 +417,7 @@ export default function Action({navigation}) {
           </View>
 
           <TouchableOpacity
-            onPress={() => toggleReply(item.id)}
+            onPress={() => toggleReply(item.id, index)}
             style={{flex: 0.5, alignItems: 'center'}}>
             <AntdesignIcon
               name={activeCaseNo === item.id ? 'minuscircleo' : 'pluscircleo'}
@@ -398,31 +455,35 @@ export default function Action({navigation}) {
                 </View>
               )}
 
-            {['FLM', 'SLM', 'TLM'].includes(userType ?? '') && (
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  disabled={item.status?.toLowerCase() !== 'pending'}
-                  onPress={() =>
-                    handleOpenApprovalModal(item.mrId, item.id, 'approved')
-                  }
-                  style={[
-                    styles.approveButton,
-                    item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
-                  ]}>
-                  <AntdesignIcon name="checkcircleo" size={20} color="green" />
-                  <Text style={styles.approveText}>Approve</Text>
-                </TouchableOpacity>
+           {['FLM', 'SLM', 'TLM'].includes(userType ?? '') && (
+  <View style={styles.actionButtons}>
+    <TouchableOpacity
+      disabled={item.status?.toLowerCase() !== 'pending'}
+      onPress={() =>
+        handleOpenApprovalModal(item.mrId, item.id, 'approved')
+      }
+      style={[
+        styles.approveButton,
+        item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
+      ]}>
+      <AntdesignIcon name="checkcircleo" size={20} color="green" />
+      <Text style={styles.approveText}>Approve</Text>
+    </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() =>
-                    handleOpenApprovalModal(item.mrId, item.id, 'rejected')
-                  }
-                  style={styles.rejectButton}>
-                  <AntdesignIcon name="closecircleo" size={20} color="red" />
-                  <Text style={styles.rejectText}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+    <TouchableOpacity
+      disabled={item.status?.toLowerCase() !== 'pending'}
+      onPress={() =>
+        handleOpenApprovalModal(item.mrId, item.id, 'rejected')
+      }
+      style={[
+        styles.rejectButton,
+        item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
+      ]}>
+      <AntdesignIcon name="closecircleo" size={20} color="red" />
+      <Text style={styles.rejectText}>Reject</Text>
+    </TouchableOpacity>
+  </View>
+)}
 
             {/* Details */}
             <Text style={styles.detailText}>
@@ -467,12 +528,9 @@ export default function Action({navigation}) {
               {item.activitySpecificDetails?.rxnDuration}
             </Text>
             <Text style={styles.detailText}>
-              <Text
-                style={[styles.detailLabel]}>
-                Date od Upload   </Text>
-                {item.dateOfUpload}
-              </Text>
-           
+              <Text style={[styles.detailLabel]}>Date of Upload </Text>
+              {item.dateOfUpload}
+            </Text>
           </View>
         )}
       </View>
@@ -481,27 +539,86 @@ export default function Action({navigation}) {
 
   return (
     <ImageBackground source={Assets.Common.background} style={styles.container}>
+          <AppStatusBar />
       <View style={styles.content}>
-        {/* Title */}
-        <Text style={styles.title}>
-          {userType === 'MR' ? 'Approval Status' : 'Prescription Approval'}
-        </Text>
+        <LinearGradient
+          colors={['rgb(225,69,209)', '#7b2ed6']}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 0}}
+          style={styles.titleGradient}>
+          <Text style={styles.title}>
+            {userType === 'MR' ? 'Approval Status' : 'Prescription Approval'}
+          </Text>
+        </LinearGradient>
 
-        {/* Date Picker */}
-        <View style={styles.dateContainer}>
-          <TouchableOpacity onPress={showDatePicker}>
-            <Text style={styles.dateText}>Date: {selectedDate}</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginHorizontal: 8,
+            marginTop: 4,
+            marginBottom: 2,
+            zIndex: 20,
+            elevation: 20,
+          }}>
+          <View style={styles.datePillBtn}>
+            <TouchableOpacity onPress={showDatePicker}>
+              <Text style={styles.datePillTxt}>
+                {formatDateDisplay(selectedDate)}
+              </Text>
+            </TouchableOpacity>
+            {!isDefaultDate && (
+              <TouchableOpacity
+                onPress={resetDate}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                style={{marginLeft: 6}}>
+                <MaterialIcons
+                  name="close"
+                  size={13}
+                  color="rgba(255,255,255,0.6)"
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={styles.filterDropdownBtn}
+            onPress={() => setFilterOpen(p => !p)}>
+            <Text style={styles.filterDropdownTxt}>
+              {statusFilter === 'all'
+                ? 'All'
+                : statusFilter.charAt(0).toUpperCase() +
+                  statusFilter.slice(1)}{' '}
+              ▾
+            </Text>
           </TouchableOpacity>
+          {filterOpen && (
+            <View style={styles.filterMenu}>
+              {['all', 'pending', 'approved', 'rejected'].map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  style={[
+                    styles.filterMenuItem,
+                    statusFilter === opt && styles.filterMenuItemActive,
+                  ]}
+                  onPress={() => {
+                    setStatusFilter(opt);
+                    setFilterOpen(false);
+                  }}>
+                  <Text style={styles.filterMenuItemTxt}>
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Header */}
         <LinearGradient
           colors={['rgba(214, 171, 215, 0.8)', 'rgba(57, 12, 89, 0.5)']}
           style={styles.header}>
           <Text style={[styles.headerText, {flex: 1.5}]}>Doctor</Text>
-
-          <Text style={[styles.headerText, {flex: 1}]}>GOALS</Text>
-          {/* <Text style={[styles.headerText, {flex: 1}]}>TIME</Text> */}
+          <Text style={[styles.headerText, {flex: 1}]}>RxBP</Text>
           <Text style={[styles.headerText, {flex: 1}]}>Time</Text>
           <Text style={[styles.headerText, {flex: 1}]}>STATUS</Text>
           <Text style={[styles.headerText, {flex: 0.5}]}></Text>
@@ -515,7 +632,18 @@ export default function Action({navigation}) {
           </View>
         ) : (
           <FlatList
-            data={uploadData}
+            ref={flatListRef}
+            onScrollToIndexFailed={info => {
+              flatListRef.current?.scrollToOffset({
+                offset: info.averageItemLength * info.index,
+                animated: true,
+              });
+            }}
+            data={
+              statusFilter === 'all'
+                ? uploadData
+                : uploadData.filter(i => i.status === statusFilter)
+            }
             renderItem={renderItem}
             keyExtractor={(item, index) => index.toString()}
             contentContainerStyle={styles.listContent}
@@ -621,36 +749,41 @@ export default function Action({navigation}) {
         transparent
         animationType="fade"
         onRequestClose={() => setSelectedImage(null)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'black',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
-          <Pressable
-            onPress={() => setSelectedImage(null)}
-            style={{
-              position: 'absolute',
-              top: 40,
-              right: 20,
-              zIndex: 1,
-            }}>
-            <MaterialIcons name="close" size={30} color="#fff" />
-          </Pressable>
-
-          <Image
-            source={{uri: selectedImage}}
-            style={{width: '100%', height: '80%'}}
-            resizeMode="contain"
-          />
-        </View>
+        <ImageViewer
+          imageUrls={selectedImage ? [{url: selectedImage}] : []}
+          onCancel={() => setSelectedImage(null)}
+          enableSwipeDown
+          swipeDownThreshold={50}
+          backgroundColor="black"
+          renderHeader={() => (
+            <TouchableOpacity
+              onPress={() => setSelectedImage(null)}
+              style={{
+                position: 'absolute',
+                top: 40,
+                right: 20,
+                zIndex: 100,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+              <MaterialIcons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+        />
       </Modal>
       <View style={styles.bottomTabs}>
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => setShowDisclaimer(true)}>
-          <AntdesignIcon name="exclamationcircleo" size={18} color="#ffffffbc" />
+          <AntdesignIcon
+            name="exclamationcircleo"
+            size={18}
+            color="#ffffffbc"
+          />
           <Text style={styles.tabText}>Disclaimer</Text>
         </TouchableOpacity>
 
@@ -743,16 +876,78 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingTop: 20,
   },
   title: {
     textAlign: 'center',
     fontSize: 16,
     color: '#fff',
-    backgroundColor: 'rgba(106, 13, 173, 0.5)',
+    fontWeight: '700',
     paddingVertical: 10,
   },
-
+  titleGradient: {
+    width: '100%',
+  },
+  datePillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(225,69,147,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  datePillTxt: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+    marginBottom: 2,
+    marginHorizontal: 8,
+    zIndex: 20,
+    elevation: 20,
+  },
+  filterDropdownBtn: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  filterDropdownTxt: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  filterMenu: {
+    position: 'absolute',
+    top: 30,
+    right: 0,
+    backgroundColor: '#2a0a4a',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    zIndex: 100,
+    elevation: 100,
+    minWidth: 110,
+    overflow: 'hidden',
+  },
+  filterMenuItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  filterMenuItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  filterMenuItemTxt: {
+    color: '#fff',
+    fontSize: 13,
+  },
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(106, 13, 173, 0.5)',
@@ -812,7 +1007,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    padding: 5,
+    padding: 2,
     marginHorizontal: 0,
     borderRadius: 5,
   },

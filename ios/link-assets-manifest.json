@@ -2,6 +2,14 @@
   "migIndex": 1,
   "data": [
     {
+      "path": "src/assets/fonts/Airstrike/Airstrike Bold.ttf",
+      "sha1": "1987fcf343b3aa117bd8d374b6d9495436aed59c"
+    },
+    {
+      "path": "src/assets/fonts/Airstrike/readme.txt",
+      "sha1": "a2027bc409269b90f4e33bb243adeb28f7e1e37b"
+    },
+    {
       "path": "src/assets/fonts/Orbitron/OFL.txt",
       "sha1": "6977a0b6d1b11bff2c36fd099c62a11c3b94e582"
     },

@@ -46,9 +46,95 @@ interface MRStat {
 }
 
 const getZone = (counter: number): 'ATTACK' | 'MIDFIELD' | 'DEFENSE' => {
-  if (counter <= 2) return 'ATTACK';
-  if (counter <= 5) return 'MIDFIELD';
-  return 'DEFENSE';
+  if (counter <= 2) return 'DEFENSE';
+  if (counter <= 4) return 'MIDFIELD';
+  return 'ATTACK';
+};
+
+const getStripInZone = (counter: number): number => {
+  if (counter === 1) return 0;
+  if (counter === 2) return 1;
+  if (counter === 3) return 0;
+  if (counter === 4) return 1;
+  if (counter === 5) return 0;
+  if (counter === 6) return 1;
+  return 0;
+};
+
+const getPositionLabel = (counter: number): string => {
+  if (counter === 1 || counter === 2) return 'Defense';
+  if (counter === 3 || counter === 4) return 'Midfield';
+  if (counter === 5 || counter === 6) return 'Attack';
+  return '-';
+};
+
+const getPlayerPositionText = (counter: number) => {
+  if (counter === 0) return '';
+  if (counter <= 2) return 'Defense';
+  if (counter <= 4) return 'Midfield';
+  return 'Attack';
+};
+
+const getPlayerAnimation = (
+  counter: number,
+  index: number,
+  isOpponent: boolean,
+) => {
+  if (counter === 0) return null;
+  const zone = getZone(Math.min(Math.max(counter, 1), 6));
+
+  // ✅ Flip zone asset for opponent — their ATTACK is our DEFENSE visually
+  const assetZone = isOpponent
+    ? zone === 'ATTACK'
+      ? 'DEFENSE'
+      : zone === 'DEFENSE'
+      ? 'ATTACK'
+      : 'MIDFIELD'
+    : zone;
+
+  const frames = isOpponent
+    ? Assets.PlayerMoves.OppTeam[assetZone]
+    : Assets.PlayerMoves.MyTeam[assetZone];
+
+  if (!frames || frames.length === 0) return null;
+  return frames[index % frames.length];
+};
+
+// Y controls zone on rotated field: ATTACK=top, DEFENSE=bottom
+const ZONE_Y_RANGES: Record<
+  'ATTACK' | 'MIDFIELD' | 'DEFENSE',
+  [number, number]
+> = {
+  ATTACK: [0.05, 0.3],
+  MIDFIELD: [0.38, 0.62],
+  DEFENSE: [0.7, 0.92],
+};
+
+const getStripAnchorY = (
+  zone: 'ATTACK' | 'MIDFIELD' | 'DEFENSE',
+  strip: number,
+): number => {
+  const [start, end] = ZONE_Y_RANGES[zone];
+  const stripHeight = (end - start) / 6;
+  return start + stripHeight * strip + stripHeight / 2;
+};
+
+const ZONE_X_RANGES: Record<
+  'ATTACK' | 'MIDFIELD' | 'DEFENSE',
+  [number, number]
+> = {
+  DEFENSE: [0.72, 0.96], // right third  (my team defends right)
+  MIDFIELD: [0.36, 0.64], // center
+  ATTACK: [0.04, 0.28], // left third   (my team attacks left)
+};
+
+const getStripAnchorX = (
+  zone: 'ATTACK' | 'MIDFIELD' | 'DEFENSE',
+  strip: number,
+): number => {
+  const [start, end] = ZONE_X_RANGES[zone];
+  const stripWidth = (end - start) / 6;
+  return start + stripWidth * strip + stripWidth / 2;
 };
 // const getStripIndex = (counter: number) => {
 //   if (counter <= 6) return counter - 1;
@@ -84,25 +170,6 @@ const getZone = (counter: number): 'ATTACK' | 'MIDFIELD' | 'DEFENSE' => {
 //   return 0.25 + (index / Math.max(total - 1, 1)) * 0.5;
 // };
 
-const getPlayerPositionText = (counter: number) => {
-  if (counter <= 2) return 'Attack';
-  if (counter <= 5) return 'Midfield';
-  return 'Defense';
-};
-
-const getPositionLabel = (counter: number): string => {
-  switch (getZone(counter)) {
-    case 'DEFENSE':
-      return 'Defense';
-    case 'MIDFIELD':
-      return 'Midfield';
-    case 'ATTACK':
-      return 'Attack';
-    default:
-      return 'Midfield';
-  }
-};
-
 // const getPlayerFrame = (counter: number, frameIdx: number) => {
 //   const zone = getZone(counter);
 //   const arr =
@@ -117,20 +184,10 @@ const getPositionLabel = (counter: number): string => {
 
 //const getPlayerStaticFrame = (counter: number) => getPlayerFrame(counter, 0);
 
-const getPlayerAnimation = (
-  counter: number,
-  index: number,
-  isOpponent: boolean,
-) => {
-  const zone = getZone(counter);
-
-  const frames = isOpponent
-    ? Assets.PlayerMoves.OppTeam[zone]
-    : Assets.PlayerMoves.MyTeam[zone];
-
-  if (!frames || frames.length === 0) return null;
-
-  return frames[index % frames.length];
+const ZONE_TO_ASSET = {
+  ATTACK: 'ATTACK',
+  MIDFIELD: 'MIDFIELD',
+  DEFENSE: 'DEFENSE',
 };
 
 const GroundModal = ({
@@ -138,11 +195,15 @@ const GroundModal = ({
   onClose,
   mrs,
   oppMrs,
+  userId,
+  bannerCounter,
 }: {
   visible: boolean;
   onClose: () => void;
-  mrs: MRStat[]; // my team
-  oppMrs: MRStat[]; // opponent team
+  mrs: MRStat[];
+  oppMrs: MRStat[];
+  userId: string;
+  bannerCounter: number;
 }) => {
   const [selectedMr, setSelectedMr] = useState<MRStat | null>(null);
   const [showOpp, setShowOpp] = useState(false); // false=my team, true=opponent
@@ -156,7 +217,6 @@ const GroundModal = ({
   const FIELD_H = Math.round(LS_H * 0.52);
   const STATS_H = LS_H - FIELD_H - LABEL_H;
 
-  // Perspective trapezoid
   const G_TOP = FIELD_H * 0.4;
   const G_BOT = FIELD_H * 0.85;
   const grassH = G_BOT - G_TOP;
@@ -167,10 +227,10 @@ const GroundModal = ({
 
   const IMG_SIZE = 40;
   const BADGE_SIZE = 13;
-  const GK_SIZE = 28;
+  const GK_SIZE = 32;
 
   // Table
-  const TABLE_W = LS_W * 0.42;
+  const TABLE_W = LS_W * 0.48;
   const COL_NAME = TABLE_W * 0.32;
   const COL_BP = TABLE_W * 0.26;
   const COL_G = TABLE_W * 0.16;
@@ -183,6 +243,8 @@ const GroundModal = ({
 
   // Active list switches with toggle
   const activeMrs = showOpp ? oppMrs : mrs;
+  console.log('MY TEAM MRS:', mrs);
+  console.log('OPP TEAM MRS:', oppMrs);
 
   const sorted = useMemo(
     () =>
@@ -212,45 +274,55 @@ const GroundModal = ({
   //   });
   //   return pos;
   // }, [zoneGroups]);
+
+  // counter 1→strip0, 2→strip1 of DEFENSE  (x: 0.05–0.18, left third)
+  // counter 3→strip0, 4→strip1, 5→strip2 of MIDFIELD (x: 0.40–0.58, center)
+  // counter 6→strip0, 7→strip1 of ATTACK   (x: 0.78–0.92, right third)
   const ZONE_ANCHORS = {
-    ATTACK: [
-      {x: 0.18, y: 0.5},
-      {x: 0.22, y: 0.56},
-      {x: 0.26, y: 0.62},
-      {x: 0.3, y: 0.68},
-      {x: 0.24, y: 0.74},
-      {x: 0.28, y: 0.8},
-    ],
-
-    MIDFIELD: [
-      {x: 0.44, y: 0.5},
-      {x: 0.48, y: 0.56},
-      {x: 0.52, y: 0.62},
-      {x: 0.56, y: 0.68},
-      {x: 0.5, y: 0.74},
-      {x: 0.54, y: 0.8},
-    ],
-
     DEFENSE: [
-      {x: 0.7, y: 0.5},
-      {x: 0.74, y: 0.56},
-      {x: 0.78, y: 0.62},
-      {x: 0.82, y: 0.68},
-      {x: 0.76, y: 0.74},
-      {x: 0.8, y: 0.8},
+      {x: 0.82, y: 0.52},
+      {x: 0.9, y: 0.52},
+      {x: 0.82, y: 0.62},
+      {x: 0.9, y: 0.62},
+      {x: 0.82, y: 0.72},
+      {x: 0.9, y: 0.72},
+    ],
+    MIDFIELD: [
+      {x: 0.42, y: 0.52},
+      {x: 0.5, y: 0.52},
+      {x: 0.58, y: 0.52},
+      {x: 0.42, y: 0.62},
+      {x: 0.5, y: 0.62},
+      {x: 0.58, y: 0.62},
+    ],
+    ATTACK: [
+      {x: 0.1, y: 0.52},
+      {x: 0.18, y: 0.52},
+      {x: 0.1, y: 0.62},
+      {x: 0.18, y: 0.62},
+      {x: 0.1, y: 0.72},
+      {x: 0.18, y: 0.72},
     ],
   };
 
-  const POSITION_ANCHORS = {
-    1: {x: 0.18, y: 0.35},
-    2: {x: 0.24, y: 0.55},
-
-    3: {x: 0.44, y: 0.3},
-    4: {x: 0.5, y: 0.5},
-    5: {x: 0.56, y: 0.7},
-
-    6: {x: 0.78, y: 0.4},
-    7: {x: 0.84, y: 0.65},
+  const counterToStripIndex = (counter: number): number => {
+    if (counter === 1) return 0; // DEFENSE strip 1 → anchor index 0
+    if (counter === 2) return 2; // DEFENSE strip 2 → anchor index 2
+    if (counter === 3) return 0; // MIDFIELD strip 3 → anchor index 0
+    if (counter === 4) return 2; // MIDFIELD strip 4 → anchor index 2
+    if (counter === 5) return 4; // MIDFIELD strip 5 → anchor index 4
+    if (counter === 6) return 0; // ATTACK strip 6 → anchor index 0
+    if (counter === 7) return 2; // ATTACK strip 7 → anchor index 2
+    return 0;
+  };
+  const POSITION_ANCHORS_MAP: Record<number, {x: number; y: number}> = {
+    1: {x: 0.82, y: 0.42}, // Defense
+    2: {x: 0.88, y: 0.62}, // Defense
+    3: {x: 0.5, y: 0.35}, // Midfield
+    4: {x: 0.5, y: 0.65}, // Midfield
+    5: {x: 0.16, y: 0.38}, // Attack
+    6: {x: 0.16, y: 0.62}, // Attack
+    7: {x: 0.04, y: 0.5}, // Goal (near left goalpost)
   };
 
   const getStripIndex = (counter: number) => {
@@ -259,40 +331,127 @@ const GroundModal = ({
     return counter - 13;
   };
 
-  const playerPositions = useMemo(() => {
-    const zoneGroups: Record<'ATTACK' | 'MIDFIELD' | 'DEFENSE', MRStat[]> = {
-      ATTACK: [],
-      MIDFIELD: [],
-      DEFENSE: [],
-    };
+  const MY_TEAM_ZONE_TO_ASSET: Record<
+    'ATTACK' | 'MIDFIELD' | 'DEFENSE',
+    'ATTACK' | 'MIDFIELD' | 'DEFENSE'
+  > = {
+    ATTACK: 'DEFENSE',
+    MIDFIELD: 'MIDFIELD',
+    DEFENSE: 'ATTACK',
+  };
 
-    sorted.forEach(mr => {
-      const zone = getZone(mr.currentCounter || 4);
-      zoneGroups[zone].push(mr);
+  const OPP_TEAM_ZONE_TO_ASSET: Record<
+    'ATTACK' | 'MIDFIELD' | 'DEFENSE',
+    'ATTACK' | 'MIDFIELD' | 'DEFENSE'
+  > = {
+    ATTACK: 'DEFENSE',
+    MIDFIELD: 'MIDFIELD',
+    DEFENSE: 'ATTACK',
+  };
+
+  // const ZONE_TO_ASSET: Record<string, 'ATTACK' | 'MIDFIELD' | 'DEFENSE'> = {
+  //   ATTACK: 'ATTACK',
+  //   MIDFIELD: 'MIDFIELD',
+  //   DEFENSE: 'DEFENSE',
+  // };
+
+  // const playerPositions = useMemo(() => {
+  //   const pos: {mr: MRStat; x: number; y: number}[] = [];
+  //   const zoneCount: Record<string, number> = {
+  //     DEFENSE: 0,
+  //     MIDFIELD: 0,
+  //     ATTACK: 0,
+  //   };
+
+  //   sorted.forEach(mr => {
+  //     const counter =
+  //       mr.mrId === userId
+  //         ? Number(stats?.currentCounter || mr.currentCounter || 1)
+  //         : mr.currentCounter || 1;
+
+  //     const zone = getZone(counter);
+  //     const anchors = ZONE_ANCHORS[zone];
+  //     const slotIdx = zoneCount[zone] % anchors.length;
+  //     zoneCount[zone]++;
+  //     pos.push({
+  //       mr,
+  //       x: anchors[slotIdx].x,
+  //       y: anchors[slotIdx].y,
+  //     });
+  //   });
+
+  //   return pos;
+  // }, [sorted]);
+
+  const buildPositions = (teamMrs: MRStat[], isOppTeam: boolean) => {
+    return teamMrs.map(mr => {
+      //console.log('MR:', mr.mrName, 'Counter:', counter, 'X:', x, 'Y:', y);
+      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 7);
+
+      // DIRECT anchor mapping by counter
+      const anchor = POSITION_ANCHORS_MAP[counter] || POSITION_ANCHORS_MAP[1];
+
+      let x = anchor.x;
+      let y = anchor.y;
+
+      // Mirror for opponent team
+      if (isOppTeam) {
+        x = 1 - x;
+      }
+
+      return {
+        mr,
+        x,
+        y,
+        isOpp: isOppTeam,
+      };
     });
+  };
 
-    const pos: {mr: MRStat; x: number; y: number}[] = [];
+  const myTeamPositions = useMemo(() => {
+    return mrs.map(mr => {
+      // Logged-in player uses banner counter
+      const counter =
+        mr.mrId === userId ? bannerCounter : mr.currentCounter || 1;
 
-    (['ATTACK', 'MIDFIELD', 'DEFENSE'] as const).forEach(zone => {
-      const players = zoneGroups[zone];
+      const zone = getZone(counter);
       const anchors = ZONE_ANCHORS[zone];
-      //  const playerPositionText = getPlayerPositionText(playerPosition);
-      players.forEach((mr, i) => {
-        const anchor = anchors[i % anchors.length];
+      const slotIdx = counterToStripIndex(counter) % anchors.length;
 
-        const offsetX = ((i % 3) - 1) * 0.02;
-        const offsetY = (Math.floor(i / 3) - 1) * 0.02;
-
-        pos.push({
-          mr,
-          x: anchor.x + offsetX,
-          y: anchor.y + offsetY,
-        });
-      });
+      return {
+        mr,
+        x: anchors[slotIdx].x,
+        y: anchors[slotIdx].y,
+        isOpp: false,
+      };
     });
+  }, [mrs, userId, bannerCounter]);
 
-    return pos;
-  }, [sorted]);
+  const oppTeamPositions = useMemo(() => {
+    return oppMrs.map(mr => {
+      const counter = mr.currentCounter || 1;
+      const zone = getZone(counter);
+      const anchors = ZONE_ANCHORS[zone];
+      const slotIdx = counterToStripIndex(counter) % anchors.length;
+
+      return {
+        mr,
+        x: 1 - anchors[slotIdx].x,
+        y: anchors[slotIdx].y,
+        isOpp: true,
+      };
+    });
+  }, [oppMrs]);
+
+ const allFieldPositions = useMemo(() => {
+  if (showOpp) {
+    // Show ONLY opponent team players on field
+    return oppTeamPositions;
+  } else {
+    // Show ONLY my team players on field  
+    return myTeamPositions;
+  }
+}, [showOpp, myTeamPositions, oppTeamPositions]);
 
   const horizontalLock = useRef(
     PanResponder.create({
@@ -312,14 +471,14 @@ const GroundModal = ({
       : 0;
 
   const toPixel = (xFrac: number, yFrac: number) => {
-    const leftEdge = TL + (BL - TL) * yFrac;
-    const rightEdge = TR + (BR - TR) * yFrac;
-
+    const leftEdge = BL + (TL - BL) * (1 - yFrac);
+    const rightEdge = BR + (TR - BR) * (1 - yFrac);
     return {
       px: leftEdge + (rightEdge - leftEdge) * xFrac,
       py: G_TOP + grassH * yFrac,
     };
   };
+
   const selectMr = (mr: MRStat) => {
     setSelectedMr(prev => (prev?.mrId === mr.mrId ? null : mr));
     const idx = sorted.findIndex(m => m.mrId === mr.mrId);
@@ -340,7 +499,7 @@ const GroundModal = ({
 
   const COLS = [
     {label: 'PLAYER NAME', w: COL_NAME},
-    {label: 'BALL\nPOSSESSION', w: COL_BP},
+    {label: 'Dribble', w: COL_BP},
     {label: 'GOALS', w: COL_G},
     {label: 'POSITION', w: COL_POS},
   ];
@@ -377,9 +536,7 @@ const GroundModal = ({
   // Toggle pill colours
   const myColor: [string, string] = ['#1a6ecc', '#c2149c'];
   const oppColor: [string, string] = ['#ab128f', '#2709be'];
-  const activeHdr: [string, string] = showOpp
-    ? oppColor
-    : ['#c2185b', '#7b0040'];
+  const activeHdr: [string, string] = ['#c2185b', '#7b0040'];
 
   return (
     <Modal
@@ -414,7 +571,7 @@ const GroundModal = ({
               width: LS_W,
               height: STATS_H,
               flexDirection: 'row',
-              alignItems: 'flex-start',
+              alignItems: 'flex-end',
               paddingTop: 6,
               paddingLeft: 2,
             }}>
@@ -446,7 +603,7 @@ const GroundModal = ({
                     gm.sliderTrack,
                     {
                       height: HDR_H + TRACK_H,
-                      backgroundColor: showOpp ? '#6b0000' : '#7b0040',
+                      backgroundColor: '#7b0040',
                     },
                   ]}>
                   <View
@@ -454,7 +611,7 @@ const GroundModal = ({
                       gm.sliderThumb,
                       {
                         top: HDR_H + sliderTop,
-                        backgroundColor: showOpp ? '#cc2222' : '#c2185b',
+                        backgroundColor: '#c2185b',
                       },
                     ]}
                   />
@@ -487,7 +644,7 @@ const GroundModal = ({
                     showsVerticalScrollIndicator={false}
                     style={{maxHeight: TABLE_AREA_H}}
                     nestedScrollEnabled>
-                    {sorted.length === 0 ? (
+                    {activeMrs.length === 0 ? (
                       <View
                         style={{
                           height: ROW_H * 2,
@@ -496,17 +653,25 @@ const GroundModal = ({
                         }}>
                         <Text
                           style={{color: 'rgba(255,255,255,0.3)', fontSize: 9}}>
-                          No data
+                          Loading...
                         </Text>
                       </View>
                     ) : (
                       sorted.map(mr => {
                         const sel = selectedMr?.mrId === mr.mrId;
+
+                        const counter =
+                          mr.mrId === userId
+                            ? bannerCounter
+                            : mr.currentCounter || 1;
+
+                        const positionText = getPositionLabel(counter);
+
                         const vals = [
                           mr.mrName,
                           String(mr.totalPoints),
                           String(mr.totalGoals),
-                          getPositionLabel(mr.currentCounter),
+                          positionText,
                         ];
                         return (
                           <TouchableOpacity
@@ -517,11 +682,7 @@ const GroundModal = ({
                               style={{
                                 flexDirection: 'row',
                                 height: ROW_H,
-                                backgroundColor: sel
-                                  ? showOpp
-                                    ? '#7a1010'
-                                    : '#5535a0'
-                                  : '#2e1060',
+                                backgroundColor: sel ? '#5535a0' : '#2e1060',
                                 borderBottomWidth: 0.5,
                                 borderBottomColor: 'rgba(255,255,255,0.07)',
                               }}>
@@ -539,7 +700,7 @@ const GroundModal = ({
                                   <Text
                                     style={{
                                       color: sel
-                                        ? 'rgb(239, 107, 202)'
+                                        ? 'rgb(239, 139, 211)'
                                         : '#fff',
                                       fontSize: 9,
                                       textAlign: 'center',
@@ -680,8 +841,8 @@ const GroundModal = ({
                 height: STATS_H,
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginRight: '25%',
-                paddingTop: 60,
+                marginRight: '18%',
+                paddingTop: 20,
               }}>
               {detailImg ? (
                 <Image
@@ -746,16 +907,15 @@ const GroundModal = ({
               )}
 
               {/* Players */}
-              {playerPositions.map(({mr, x, y}, i) => {
+              {allFieldPositions.map(({mr, x, y, isOpp}, i) => {
                 const sel = selectedMr?.mrId === mr.mrId;
-                const frame = getPlayerAnimation(
-                  mr.currentCounter || 4,
-                  i,
-                  showOpp,
-                );
+                const counter =
+                  mr.mrId === userId ? bannerCounter : mr.currentCounter || 1;
+
+                const frame = getPlayerAnimation(counter, i, isOpp);
                 if (!frame) return null;
                 const {px, py} = toPixel(x, y);
-                const zone = getZone(mr.currentCounter || 4);
+                const zone = getZone(counter);
                 const zc = showOpp
                   ? '#fff'
                   : zone === 'ATTACK'
@@ -766,7 +926,7 @@ const GroundModal = ({
 
                 return (
                   <Pressable
-                    key={mr.mrId}
+                    key={`${isOpp ? 'opp' : 'my'}-${mr.mrId}`}
                     onPress={() => {
                       selectMr(mr);
                       zoomToPoint(px, py);
@@ -841,7 +1001,9 @@ const GroundModal = ({
               backgroundColor: '#111118',
             }}>
             <Image
-              source={Assets.Home.AttackLabel}
+              source={
+                showOpp ? Assets.Home.DefenceLabel : Assets.Home.AttackLabel
+              }
               style={{width: LBL_W, height: LBL_H, marginBottom: '4%'}}
               resizeMode="contain"
             />
@@ -851,7 +1013,9 @@ const GroundModal = ({
               resizeMode="contain"
             />
             <Image
-              source={Assets.Home.DefenceLabel}
+              source={
+                showOpp ? Assets.Home.AttackLabel : Assets.Home.DefenceLabel
+              }
               style={{width: LBL_W, height: LBL_H, marginBottom: '4%'}}
               resizeMode="contain"
             />
@@ -868,8 +1032,9 @@ const MatchSummary = () => {
   const socket = useSelector((state: RootState) => state.socket?.instance);
   const isMR = (role ?? '').toUpperCase() === 'MR';
   const stats = useSelector((state: RootState) => state.player?.stats);
-  console.log('PLAYER STATS:', stats);
+  //console.log('PLAYER STATS:', stats);
   const isMatchActive = isMR ? stats?.isMatchOn === 1 : true;
+  const [flmLast5, setFlmLast5] = useState<number[]>([]);
 
   const [totalGoals, setTotalGoals] = useState(0);
   const [allMrs, setAllMrs] = useState<MRStat[]>([]);
@@ -881,23 +1046,56 @@ const MatchSummary = () => {
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const goalHandledRef = useRef(false);
+  const lastTapRef = useRef<number>(0);
   const rawCounter = Number(stats?.currentCounter ?? 1);
+  console.log('stats.totalGoals', stats?.totalGoals);
+  console.log('stats.currentMatchGoals', stats?.currentMatchGoals);
   const playerPosition = Math.min(Math.max(rawCounter, 1), 7);
+
   const playerPositionText = getPlayerPositionText(playerPosition);
+  console.log('BANNER COUNTER FROM REDUX:', rawCounter);
+  console.log(
+    'API COUNTER FROM myTeamMrs:',
+    allMrs.map(m => m.currentCounter),
+  );
+  console.log('Banner Counter:', rawCounter);
+  console.log('Banner Position:', playerPosition);
+  console.log('Avg Position:', clampedAvg);
+  console.log(
+    'allMrs goals',
+    allMrs.map(m => ({
+      name: m.mrName,
+      goals: m.totalGoals,
+    })),
+  );
+
+  // const playerPosition =
+  //   rawCounter > 0 ? Math.min(Math.max(rawCounter, 1), 7) : 1;
+  // const playerPositionText = getPlayerPositionText(playerPosition);
 
   const [avgFrameIndex, setAvgFrameIndex] = useState(0);
   const avgTranslateX = useRef(new Animated.Value(0)).current;
-  const clampedAvg = Math.min(
-    Math.max(isNaN(avgPosition) || !avgPosition ? 1 : avgPosition, 1),
-    7,
+  const safeAvg = Number(avgPosition) || 1;
+  const clampedAvg = Math.min(Math.max(safeAvg, 1), 7);
+  console.log('Banner Counter:', rawCounter);
+  console.log('Banner Position:', playerPosition);
+  console.log('Avg Position:', clampedAvg);
+  console.log(
+    'MyTeam Counters:',
+    allMrs.map(m => m.currentCounter),
   );
 
-  const avgFrames = Assets.PlayerPosition[clampedAvg];
-  const avgPositionSrc =
-    Array.isArray(avgFrames) && avgFrames.length > 0
-      ? avgFrames[avgFrameIndex % avgFrames.length]
-      : null;
+  const avgFrames =
+    Assets.PlayerPosition[clampedAvg] || Assets.PlayerPosition[1];
+  const bannerCounter = playerPosition || clampedAvg || 1;
 
+  const bannerFrames =
+    Assets.PlayerPosition[bannerCounter] || Assets.PlayerPosition[1];
+
+  const bannerSrc =
+    Array.isArray(bannerFrames) && bannerFrames.length > 0
+      ? bannerFrames[avgFrameIndex % bannerFrames.length]
+      : bannerFrames;
   console.log('roleeeses', role);
   console.log('roleeeses', userId);
   console.log('roleeeses', isMR);
@@ -912,20 +1110,25 @@ const MatchSummary = () => {
 
     try {
       if (userRole === 'mr') {
-        const matchId = stats?.fastestGoalMatchId;
+        let matchId = stats?.fastestGoalMatchId;
 
         if (!matchId) {
-          console.log('No matchId for MR');
+          const matchRes = await fetch(
+            `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=mr`,
+          );
+          const matchJson = await matchRes.json();
+          matchId = matchJson?.data?.matches?.[0]?.matchId;
+        }
+
+        if (!matchId) {
+          console.log('No matchId found');
           return;
         }
-        //console.log("MR MATCH ID:", stats?.matchId);
+
         const mrRes = await fetch(
-          `${BASE_URL}/matches/${stats?.fastestGoalMatchId}/mr-stats?userId=${userId}&userRole=mr`,
+          `${BASE_URL}/matches/${matchId}/mr-stats?userId=${userId}&userRole=mr`,
         );
-
         const mrJson = await mrRes.json();
-
-        console.log('MR STATS RESPONSE:', mrJson);
 
         if (!mrJson.success || !mrJson.data) return;
 
@@ -945,61 +1148,73 @@ const MatchSummary = () => {
           }),
         );
 
-        setAllMrs(myTeamData);
-        setAllOppMrs(opponentTeamData);
+        // ✅ CHECK which array the logged-in MR actually belongs to
+        const iAmInMyTeam = myTeamData.some((mr: MRStat) => mr.mrId === userId);
+        const iAmInOppTeam = opponentTeamData.some(
+          (mr: MRStat) => mr.mrId === userId,
+        );
+
+        console.log('MR userId:', userId);
+        console.log('iAmInMyTeam:', iAmInMyTeam);
+        console.log('iAmInOppTeam:', iAmInOppTeam);
+
+        if (iAmInOppTeam && !iAmInMyTeam) {
+          console.log('SWAPPING teams for MR');
+          setAllMrs(opponentTeamData);          
+  setAllOppMrs(myTeamData);           
+} else {
+  setAllMrs(myTeamData);
+  setAllOppMrs(opponentTeamData);
+}
 
         return;
       }
       console.log('yaha tak aaya');
+      // Replace the entire FLM branch (after "console.log('yaha tak aaya')") with this:
+
       const matchRes = await fetch(
         `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=${userRole}`,
       );
-
-      console.log('matchRessss', matchRes);
       const matchJson = await matchRes.json();
-
-      // if (!matchJson.success || !Array.isArray(matchJson.data?.matches)) return;
 
       const matches: MatchStat[] = matchJson.data.matches;
 
-      // total goals
       setTotalGoals(
         matches.reduce((sum, m) => sum + (Number(m.totalGoalsByMyMRs) || 0), 0),
       );
 
-      // average position
       const medianSum = matches.reduce(
         (sum, m) => sum + (Number(m.medianCounter) || 1),
         0,
       );
-
       const avg =
         matches.length > 0 ? Math.round(medianSum / matches.length) : 1;
-
       setAvgPosition(isNaN(avg) || avg < 1 ? 1 : Math.min(avg, 7));
 
-      // arrays to collect data
-      const myTeam: MRStat[] = [];
-      const opponentTeam: MRStat[] = [];
-      console.log('gtrtrrrrrrrrrrrrrrrrrrr');
+      const last5Goals = matches
+        .slice(0, 5)
+        .map(m => Number(m.totalGoalsByMyMRs) || 0);
+      while (last5Goals.length < 5) last5Goals.push(0);
+      setFlmLast5(last5Goals);
+
+      // ✅ Declare ONCE outside the loop
+      const myTeamFinal: MRStat[] = [];
+      const oppTeamFinal: MRStat[] = [];
+
       for (const m of matches) {
         const mrRes = await fetch(
           `${BASE_URL}/matches/${m.matchId}/mr-stats?userId=${userId}&userRole=${userRole}`,
         );
-        // console.log('ressssssssssssss:' matches,)
         const mrJson = await mrRes.json();
-        console.log('MR API RESPONSE:', JSON.stringify(mrJson, null, 2));
-
         if (!mrJson.success || !mrJson.data) continue;
-        console.log('MY TEAM RAW:', mrJson.data.myTeamMrs);
-        console.log('OPP TEAM RAW:', mrJson.data.opponentMrs);
+
         const myTeamData = (mrJson.data.myTeamMrs || []).map((mr: MRStat) => ({
           ...mr,
           currentCounter: Math.max(1, Number(mr.currentCounter) || 1),
           totalGoals: Number(mr.totalGoals) || 0,
           totalPoints: Number(mr.totalPoints) || 0,
         }));
-        console.log('MY TEAM AFTER MAP:', myTeamData);
+
         const opponentTeamData = (mrJson.data.opponentMrs || []).map(
           (mr: MRStat) => ({
             ...mr,
@@ -1009,17 +1224,47 @@ const MatchSummary = () => {
           }),
         );
 
-        myTeam.push(...myTeamData);
-        opponentTeam.push(...opponentTeamData);
+        if (myTeamFinal.length === 0 && oppTeamFinal.length === 0) {
+          // Check by flmId since logged-in user is an FLM
+          const userInMyTeam = myTeamData.some(
+            (mr: MRStat) => mr.flmId === userId,
+          );
+          const userInOppTeam = opponentTeamData.some(
+            (mr: MRStat) => mr.flmId === userId,
+          );
+
+          console.log('userId:', userId);
+          console.log(
+            'myTeamData flmIds:',
+            myTeamData.map((m: MRStat) => m.flmId),
+          );
+          console.log(
+            'oppTeamData flmIds:',
+            opponentTeamData.map((m: MRStat) => m.flmId),
+          );
+          console.log(
+            'userInMyTeam:',
+            userInMyTeam,
+            '| userInOppTeam:',
+            userInOppTeam,
+          );
+
+          if (userInOppTeam && !userInMyTeam) {
+            // Swap — API returned teams from opponent FLM's perspective
+            myTeamFinal.push(...opponentTeamData);
+            oppTeamFinal.push(...myTeamData);
+          } else {
+            myTeamFinal.push(...myTeamData);
+            oppTeamFinal.push(...opponentTeamData);
+          }
+        }
       }
 
-      console.log('loggggggggggggggggggggggggs:');
-      // update state once
-      setAllMrs(myTeam);
-      setAllOppMrs(opponentTeam);
+      setAllMrs(myTeamFinal);
+      setAllOppMrs(oppTeamFinal);
 
-      console.log('MY TEAM:', myTeam);
-      console.log('OPP TEAM:', opponentTeam);
+      console.log('MY TEAM:', myTeamFinal);
+      console.log('OPP TEAM:', oppTeamFinal);
     } catch (err) {
       console.log('Fetch Error:', err);
     }
@@ -1183,91 +1428,103 @@ const MatchSummary = () => {
     if (!stats.isGoal) goalHandledRef.current = false;
   }, [stats?.isGoal, stats?.currentCounter, isMR]);
 
-  const mrFrames = Assets.PlayerPosition[playerPosition];
+  const displayPosition = rawCounter === 0 ? 1 : playerPosition;
+  const mrFrames = Assets.PlayerPosition[displayPosition];
   const positionSrc =
     Array.isArray(mrFrames) && mrFrames.length > 0
       ? mrFrames[frameIndex % mrFrames.length]
       : null;
   const lastMatches = ['2', '0', '0', '1', '2'];
+
   return (
     <Box paddingHorizontal="m" style={{marginTop: '1%'}}>
+      <Box
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
+        right={10}>
+        <Text
+          variant="header"
+          fontSize={16}
+          fontFamily={'Airstrike Bold'}
+          color="white">
+          LAST 5 MATCHES
+        </Text>
+        <Box flexDirection="row" alignItems="center">
+          {(isMR ? stats?.last5MatchGoals : flmLast5)?.map((score, index) => {
+            const numScore = Number(score);
+
+            // ── decide outcome ──
+            // adjust this logic to match your actual data structure
+            const isWin = numScore >= 2;
+            const isLoss = numScore === 0;
+            const isDraw = !isWin && !isLoss;
+
+            // const borderColor = isWin ? '#00e676' : isLoss ? '#ff1744' : '#ffeb3b';
+            const outcomeImg = isWin
+              ? Assets.Home.win
+              : isLoss
+              ? Assets.Home.loss
+              : Assets.Home.Draw;
+
+            return (
+              <Box key={index} flexDirection="row" alignItems="center">
+                <Box
+                  width={38}
+                  height={38}
+                  borderRadius={19}
+                  //  backgroundColor="transparentPurple"
+                  justifyContent="center"
+                  alignItems="center"
+                  //  borderWidth={1.5}
+                  style={[styles.circleBorder]}>
+                  {/* ── outcome image ── */}
+                  <Image
+                    source={outcomeImg}
+                    style={{
+                      width: 28,
+                      height: 30,
+                      position: 'absolute',
+                      //  opacity: 0.25,   // subtle background icon
+                    }}
+                    resizeMode="contain"
+                  />
+
+                  {/* ── score number on top ── */}
+                  <Text color="white" fontWeight="bold" fontSize={13}>
+                    {score}
+                  </Text>
+                </Box>
+
+                {index <
+                  ((isMR ? stats?.last5MatchGoals : flmLast5)?.length ?? 0) -
+                    1 && (
+                  <Box
+                    width={14}
+                    height={2}
+                    style={{
+                      marginHorizontal: -5,
+                      borderWidth: 1,
+                      backgroundColor: 'rgba(7, 7, 7, 0.4)', // ← just add this line
+                    }}
+                  />
+                )}
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
       <TouchableOpacity
         activeOpacity={isMatchActive ? 0.85 : 1}
         disabled={!isMatchActive}
         onPress={() => {
-          if (isMatchActive) {
+          if (!isMatchActive) return;
+          const now = Date.now();
+          if (now - lastTapRef.current < 300) {
             setShowGround(true);
           }
+          lastTapRef.current = now;
         }}>
-        <Box
-          flexDirection="row"
-          alignItems="center"
-          justifyContent="space-between">
-          <Text variant="header" fontSize={16} fontStyle="italic" color="white">
-            LAST 5 MATCHES
-          </Text>
-          <Box flexDirection="row" alignItems="center">
-            {stats?.last5MatchGoals?.map((score, index) => {
-              const numScore = Number(score);
-
-              // ── decide outcome ──
-              // adjust this logic to match your actual data structure
-              const isWin = numScore >= 2;
-              const isLoss = numScore === 0;
-              const isDraw = !isWin && !isLoss;
-
-              // const borderColor = isWin ? '#00e676' : isLoss ? '#ff1744' : '#ffeb3b';
-              const outcomeImg = isWin
-                ? Assets.Home.win // 👈 replace with your actual asset key
-                : isLoss
-                ? Assets.Home.loss // 👈 replace with your actual asset key
-                : Assets.Home.Draw; // 👈 replace with your actual asset key
-
-              return (
-                <Box key={index} flexDirection="row" alignItems="center">
-                  <Box
-                    width={38}
-                    height={38}
-                    borderRadius={19}
-                    //  backgroundColor="transparentPurple"
-                    justifyContent="center"
-                    alignItems="center"
-                    //  borderWidth={1.5}
-                    style={[styles.circleBorder]}>
-                    {/* ── outcome image ── */}
-                    <Image
-                      source={outcomeImg}
-                      style={{
-                        width: 30,
-                        height: 30,
-                        position: 'absolute',
-                        //  opacity: 0.25,   // subtle background icon
-                      }}
-                      resizeMode="contain"
-                    />
-
-                    {/* ── score number on top ── */}
-                    <Text color="white" fontWeight="bold" fontSize={13}>
-                      {score}
-                    </Text>
-                  </Box>
-
-                  {index < (stats?.last5MatchGoals?.length ?? 0) - 1 && (
-                    <Box
-                      width={14}
-                      height={2}
-                      style={{
-                        marginHorizontal: -1,
-                        borderWidth:1,
-                        backgroundColor: 'rgba(7, 7, 7, 0.4)', // ← just add this line
-                      }}
-                    />
-                  )}
-                </Box>
-              );
-            })}
-          </Box>
-        </Box>
         <Box
           style={styles.bannerBackground}
           borderRadius={15}
@@ -1277,59 +1534,130 @@ const MatchSummary = () => {
           justifyContent="space-between"
           height={90}
           overflow="hidden">
+          {/* Player Position label top-left */}
           <Box position="absolute" top={6} left={11} zIndex={1}>
             <Text color="white" fontSize={8} letterSpacing={1}>
               Player Position
             </Text>
-
-            <Text
-              color="white"
-              fontSize={8}
-              fontWeight="600"
-              marginTop="xs"
-              fontFamily={'Orbitron-Black'}>
-              {playerPositionText}
-            </Text>
           </Box>
+
+          {/* Bottom line */}
           <View
             style={{
               position: 'absolute',
               bottom: 2,
               left: 40,
-              right: 40,
+              right: 50,
               height: 2,
               backgroundColor: 'rgba(255,255,255,0.7)',
               borderRadius: 2,
             }}
           />
-          <Box flex={1} justifyContent="center" alignItems="flex-start">
-            {isMR
-              ? positionSrc != null && (
-                  <Animated.View style={{transform: [{translateX}]}}>
-                    <Image
-                      key={frameIndex}
-                      source={positionSrc}
-                      style={{width: 50, height: 60, marginTop: 30, right: 8}}
-                    />
-                  </Animated.View>
-                )
-              : avgPositionSrc != null && (
-                  <Animated.View
-                    style={{transform: [{translateX: avgTranslateX}]}}>
-                    <Image
-                      key={avgFrameIndex}
-                      source={avgPositionSrc}
-                      style={{width: 50, height: 60, marginTop: 30, right: 50}}
-                    />
-                  </Animated.View>
+
+          <Box flex={1} justifyContent="flex-end" alignItems="flex-start">
+            {isMR && positionSrc != null && rawCounter > 0 && (
+              <Animated.View
+                style={{
+                  transform: [{translateX}],
+                  flexDirection: 'row',
+                  alignItems: 'flex-end',
+                }}>
+                {/* ATTACK: text renders first = behind player */}
+                {playerPositionText === 'Attack' && (
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 16,
+                      fontFamily: 'Airstrike Bold',
+                      //   fontStyle: 'italic',
+                      letterSpacing: 1,
+                      marginBottom: 10,
+                      marginRight: 2,
+                      textShadowColor: 'rgba(0,0,0,0.9)',
+                      textShadowOffset: {width: 1, height: 1},
+                      textShadowRadius: 4,
+                    }}>
+                    {playerPositionText.toUpperCase()}
+                  </Text>
                 )}
+
+                {/* Player image always in middle */}
+                <Image
+                  key={frameIndex}
+                  source={positionSrc}
+                  style={{width: 44, height: 55, top: 20, right: 10}}
+                />
+
+                {/* DEFENSE / MIDFIELD: text renders after = in front of player */}
+                {playerPositionText !== 'Attack' && (
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 15,
+                      fontFamily: 'Airstrike Bold',
+                      //  fontStyle: 'italic',
+                      letterSpacing: 1,
+                      marginBottom: 10,
+                      marginLeft: 4,
+                      textShadowColor: 'rgba(0,0,0,0.9)',
+                      textShadowOffset: {width: 1, height: 1},
+                      textShadowRadius: 4,
+                    }}>
+                    {playerPositionText.toUpperCase()}
+                  </Text>
+                )}
+              </Animated.View>
+            )}
+            {!isMR && bannerSrc != null && (
+              <Animated.View
+                style={{
+                  transform: [{translateX: avgTranslateX}],
+                  flexDirection: 'row',
+                  alignItems: 'flex-end',
+                }}>
+                {getPlayerPositionText(clampedAvg) === 'Attack' && (
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 15,
+                      fontFamily: 'Airstrike Bold',
+                      letterSpacing: 1,
+                      marginBottom: 10,
+                      marginRight: 18,
+                    }}>
+                    {getPlayerPositionText(clampedAvg).toUpperCase()}
+                  </Text>
+                )}
+
+                <Image
+                  key={avgFrameIndex}
+                  source={bannerSrc}
+                  style={{width: 44, height: 55, top: 15, right: 10}}
+                />
+
+                {getPlayerPositionText(clampedAvg) !== 'Attack' && (
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontSize: 15,
+                      fontFamily: 'Airstrike Bold',
+                      letterSpacing: 1,
+                      marginBottom: 10,
+                      marginRight: 18,
+                      marginLeft: 4,
+                    }}>
+                    {getPlayerPositionText(clampedAvg).toUpperCase()}
+                  </Text>
+                )}
+              </Animated.View>
+            )}
           </Box>
           <Image
             source={Assets.Home.icons10}
-            style={{width: 60, height: 60, marginBottom: -4, left: 25}}
+            style={{width: 60, height: 60, marginBottom: -30, left: 40}}
             resizeMode="contain"
           />
-          <Box alignItems="flex-end" bottom={30} left={10}>
+          <Box alignItems="flex-end" bottom={30} left={20}>
             <Text
               color="white"
               fontSize={10}
@@ -1351,6 +1679,8 @@ const MatchSummary = () => {
         onClose={() => setShowGround(false)}
         mrs={allMrs}
         oppMrs={allOppMrs}
+        userId={userId}
+        bannerCounter={rawCounter}
       />
     </Box>
   );

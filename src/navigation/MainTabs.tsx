@@ -8,13 +8,18 @@ import Action from '../features/screens/Action';
 import NotificationScreen from '../features/screens/Notification';
 import {useSelector} from 'react-redux';
 import {RootState} from '../redux/store';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 
 const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
   const role = useSelector((state: RootState) => state.auth.role);
   console.log('Redux Role:', role);
-console.log('Full auth state:', useSelector((state: RootState) => state.auth));
+  console.log(
+    'Full auth state:',
+    useSelector((state: RootState) => state.auth),
+  );
   return (
     <Tab.Navigator
       initialRouteName="Home"

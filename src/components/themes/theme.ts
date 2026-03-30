@@ -50,12 +50,14 @@ export const theme = createTheme({
   },
   textVariants: {
     defaults: {
+     // fontFamily: 'Airstrike Bold',
       fontSize: 16,
       color: 'textPrimary',
     },
     header: {
+      fontFamily: 'Airstrike Bold', 
       fontSize: 34, 
-      fontWeight: 'bold', 
+   //   fontWeight: 'bold', 
       color: 'textPrimary',
     },
     body: {

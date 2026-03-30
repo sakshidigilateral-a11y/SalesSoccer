@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   ImageBackground,
   StyleSheet,
@@ -12,19 +12,21 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as RNFS from 'react-native-fs';
 import {Box, Text} from '../../components/themes';
 import {Assets} from '../../assets/images';
 import axios from 'axios';
 import LinearGradient from 'react-native-linear-gradient';
+import {StatusBar, Platform} from 'react-native';
+import AppStatusBar from '../Home/components/AppStatusBar';
+
 
 const {width, height} = Dimensions.get('window');
+
 const API_URL = 'https://salessoccer.digilateral.com';
 
 type TabType = 'Player Rank' | 'Team Rank' | 'Compare Players';
 
-// ── Dynamic types from API ──────────────────────────────────────────
 interface WeekData {
   weekNumber: number;
   startDate: string;
@@ -66,6 +68,7 @@ interface ComparePlayerStats {
   mrId: string;
   mrName: string;
   teamName: string;
+  hq?: string; // ← from doc 7
   totalGoals: number;
   avgGoals: number;
   totalPrescriptions: number;
@@ -76,7 +79,6 @@ interface ComparePlayerStats {
   hrsPerGoal: number | null;
 }
 
-// ── helpers ─────────────────────────────────────────────────────────
 const formatDateRange = (startDate: string, endDate: string): string => {
   const fmt = (d: string) => {
     const dt = new Date(d);
@@ -84,44 +86,38 @@ const formatDateRange = (startDate: string, endDate: string): string => {
   };
   return `${fmt(startDate)} - ${fmt(endDate)}`;
 };
-
-// ────────────────────────────────────────────────────────────────────
+const formatTeamName = (name: string): string => {
+  return name.replace(/([A-Z][a-z]+)/g, '$1\n').trim();
+};
 const LeaderboardScreen = () => {
   const [activeTab, setActiveTab] = useState<TabType>('Player Rank');
-
-  // dynamic month/week state
   const [months, setMonths] = useState<MonthData[]>([]);
   const [activeMonth, setActiveMonth] = useState<MonthData | null>(null);
   const [activeWeek, setActiveWeek] = useState<WeekData | null>(null);
   const [loadingPeriods, setLoadingPeriods] = useState(true);
-
-  // leaderboard state
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [playerData, setPlayerData] = useState<PlayerData[]>([]);
   const [teamData, setTeamData] = useState<TeamData[]>([]);
   const [teamLogos, setTeamLogos] = useState<{[key: string]: string}>({});
-
-  // compare state
   const [showPlayerModal, setShowPlayerModal] = useState(false);
   const [selectingPlayer, setSelectingPlayer] = useState<1 | 2>(1);
   const [allPlayers, setAllPlayers] = useState<ComparePlayerStats[]>([]);
   const [player1, setPlayer1] = useState<ComparePlayerStats | null>(null);
   const [player2, setPlayer2] = useState<ComparePlayerStats | null>(null);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [teamModalVisible, setTeamModalVisible] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamData | null>(null);
 
   const tabs: TabType[] = ['Player Rank', 'Team Rank', 'Compare Players'];
 
-  // ── 1. Fetch months & weeks on mount ───────────────────────────────
   useEffect(() => {
     const fetchPeriods = async () => {
       try {
         setLoadingPeriods(true);
         const res = await axios.get(`${API_URL}/api/mr/months-weeks-days`);
         if (res.data.success && Array.isArray(res.data.data?.months)) {
-          const data: MonthData[] = res.data.data.months;
-          setMonths(data);
-          // default: All (no month filter)
+          setMonths(res.data.data.months);
           setActiveMonth(null);
           setActiveWeek(null);
         }
@@ -134,7 +130,6 @@ const LeaderboardScreen = () => {
     fetchPeriods();
   }, []);
 
-  // ── 2. Fetch leaderboard whenever tab / month / week changes ───────
   useEffect(() => {
     if (activeTab === 'Compare Players') {
       fetchPlayersForComparison();
@@ -147,7 +142,6 @@ const LeaderboardScreen = () => {
   const buildParams = () => {
     if (!activeMonth) return {period: 'all'};
     if (activeWeek) {
-      // week-level filter
       return {
         period: 'weekly',
         month: activeMonth.month,
@@ -156,7 +150,6 @@ const LeaderboardScreen = () => {
         endDate: activeWeek.endDate,
       };
     }
-    // month-level filter
     return {
       period: 'monthly',
       month: activeMonth.month,
@@ -168,7 +161,6 @@ const LeaderboardScreen = () => {
     try {
       isRefreshing ? setRefreshing(true) : setLoading(true);
       const params = buildParams();
-
       if (activeTab === 'Player Rank') {
         const res = await axios.get(`${API_URL}/api/mr/player-leaderboard`, {
           params,
@@ -199,6 +191,10 @@ const LeaderboardScreen = () => {
       setLoadingPlayers(true);
       const res = await axios.get(`${API_URL}/api/mr/players-compare`);
       if (res.data.success) {
+        console.log(
+          'PLAYER DATA SAMPLE:',
+          JSON.stringify(res.data.data[0], null, 2),
+        );
         setAllPlayers(res.data.data);
         await loadTeamLogos(res.data.data);
       }
@@ -225,39 +221,26 @@ const LeaderboardScreen = () => {
     setTeamLogos(logos);
   };
 
-  // ── month / week selection ──────────────────────────────────────────
   const handleMonthPress = (month: MonthData) => {
-    // Always switch to the tapped month and clear week
     setActiveMonth(month);
     setActiveWeek(null);
   };
-
   const handleAllPress = () => {
-    // "All" = no month filter
     setActiveMonth(null);
     setActiveWeek(null);
   };
-
   const handleWeekPress = (week: WeekData) => {
-    if (activeWeek?.weekNumber === week.weekNumber) {
-      // deselect week → back to full month
-      setActiveWeek(null);
-    } else {
-      setActiveWeek(week);
-    }
+    setActiveWeek(activeWeek?.weekNumber === week.weekNumber ? null : week);
   };
 
-  // ── compare helpers ─────────────────────────────────────────────────
   const handlePlayerSelect = (player: ComparePlayerStats) => {
     selectingPlayer === 1 ? setPlayer1(player) : setPlayer2(player);
     setShowPlayerModal(false);
   };
-
   const openPlayerSelector = (n: 1 | 2) => {
     setSelectingPlayer(n);
     setShowPlayerModal(true);
   };
-
   const getFilteredPlayers = () =>
     selectingPlayer === 1
       ? player2
@@ -267,7 +250,6 @@ const LeaderboardScreen = () => {
       ? allPlayers.filter(p => p.mrId !== player1.mrId)
       : allPlayers;
 
-  // ── render helpers ──────────────────────────────────────────────────
   const renderPlayerItem = ({item}: {item: PlayerData}) => (
     <View style={styles.playerRow}>
       <View style={styles.rankColumn}>
@@ -302,7 +284,13 @@ const LeaderboardScreen = () => {
   );
 
   const renderTeamItem = ({item}: {item: TeamData}) => (
-    <View style={styles.playerRow}>
+    <TouchableOpacity
+      style={styles.playerRow}
+      activeOpacity={0.8}
+      onPress={() => {
+        setSelectedTeam(item);
+        setTeamModalVisible(true);
+      }}>
       <View style={styles.rankColumn}>
         <Text style={styles.rankText}>{item.rank}</Text>
       </View>
@@ -327,7 +315,7 @@ const LeaderboardScreen = () => {
       <View style={styles.rxbpColumn}>
         <Text style={styles.statsText}>{item.prescriptions}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderEmptyComponent = () => (
@@ -347,15 +335,16 @@ const LeaderboardScreen = () => {
     label: string,
     value1: number | string | null | undefined,
     value2: number | string | null | undefined,
+    labelImage?: any,
   ) => {
     const num1 =
-      value1 !== null && value1 !== undefined
+      value1 != null
         ? typeof value1 === 'string'
           ? parseFloat(value1) || 0
           : value1
         : 0;
     const num2 =
-      value2 !== null && value2 !== undefined
+      value2 != null
         ? typeof value2 === 'string'
           ? parseFloat(value2) || 0
           : value2
@@ -369,7 +358,25 @@ const LeaderboardScreen = () => {
         <View style={styles.barSection}>
           <View style={styles.valueRow}>
             <Text style={styles.statValueLeft}>{value1 ?? 0}</Text>
-            <Text style={styles.statLabelSport}>{label}</Text>
+            {labelImage ? (
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  gap: 0,
+                  marginRight: 10,
+                }}>
+                <Image
+                  source={labelImage}
+                  style={{width: 16, height: 16, resizeMode: 'contain'}}
+                />
+                <Text style={styles.statLabelSport}>{label}</Text>
+              </View>
+            ) : (
+              <Text style={styles.statLabelSport}>{label}</Text>
+            )}
             <Text style={styles.statValueRight}>{value2 ?? 0}</Text>
           </View>
           <View style={styles.barWrapper}>
@@ -430,60 +437,74 @@ const LeaderboardScreen = () => {
         </View>
 
         <View style={styles.playerSelectionRow}>
+          {/* ── Player 1 ── */}
           <TouchableOpacity
             style={styles.playerCard}
-            onPress={() => openPlayerSelector(1)}>
+            onPress={() => !player1 && openPlayerSelector(1)}>
             <View style={styles.playerCardGradient}>
-              {/* Indicator line */}
               <View style={styles.player1Indicator} />
-
               {player1 ? (
                 <View style={styles.selectedPlayerInfo}>
                   <Text style={styles.selectedPlayerName} numberOfLines={1}>
                     {player1.mrName.toUpperCase()}
                   </Text>
-
                   {teamLogos[player1.teamName] && (
                     <Image
                       source={{uri: teamLogos[player1.teamName]}}
                       style={styles.selectedTeamLogo}
                     />
                   )}
-
-                  {/* Indicator line */}
-                  <View style={styles.player1Line} />
+                  <TouchableOpacity
+                    style={styles.clearPlayerBtnAbsolute}
+                    onPress={() => setPlayer1(null)}>
+                    <Text style={styles.clearPlayerTxt}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
-                <Text style={styles.selectText}>Tap to Select</Text>
+                <TouchableOpacity
+                  onPress={() => openPlayerSelector(1)}
+                  style={{alignItems: 'center'}}>
+                  <Image
+                    source={Assets.Home.PlayerPosition}
+                    style={styles.selectPlayerImage}
+                  />
+                </TouchableOpacity>
               )}
             </View>
           </TouchableOpacity>
 
+          {/* ── Player 2 ── */}
           <TouchableOpacity
             style={styles.playerCard}
-            onPress={() => openPlayerSelector(2)}>
+            onPress={() => !player2 && openPlayerSelector(2)}>
             <View style={styles.playerCardGradient}>
-              {/* Indicator line */}
               <View style={styles.player2Indicator} />
-
               {player2 ? (
                 <View style={styles.selectedPlayerInfo}>
                   <Text style={styles.selectedPlayerName} numberOfLines={1}>
                     {player2.mrName.toUpperCase()}
                   </Text>
-
                   {teamLogos[player2.teamName] && (
                     <Image
                       source={{uri: teamLogos[player2.teamName]}}
                       style={styles.selectedTeamLogo}
                     />
                   )}
-
-                  {/* Indicator line */}
-                  <View style={styles.player2Line} />
+                  <TouchableOpacity
+                    style={styles.clearPlayerBtn}
+                    onPress={() => setPlayer2(null)}>
+                    <Text style={styles.clearPlayerTxt}>✕</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
-                <Text style={styles.selectText}>Tap to Select</Text>
+                <TouchableOpacity
+                  onPress={() => openPlayerSelector(2)}
+                  style={{alignItems: 'center'}}>
+                  <Image
+                    source={Assets.Home.PlayerPosition1}
+                    style={styles.selectPlayerImage}
+                  />
+                </TouchableOpacity>
               )}
             </View>
           </TouchableOpacity>
@@ -502,7 +523,7 @@ const LeaderboardScreen = () => {
               safeNumber(player2.avgGoals, 1),
             )}
             {renderComparisonStat(
-              'BALL POSSESSION (RXN)',
+              'Dribble',
               player1.totalPrescriptions,
               player2.totalPrescriptions,
             )}
@@ -513,24 +534,27 @@ const LeaderboardScreen = () => {
             )}
             {renderComparisonStat('WON', player1.wins, player2.wins)}
             {renderComparisonStat(
-              '⚡ FASTEST GOAL',
+              'FASTEST GOAL',
               safeNumber(player1.fastestGoalTime),
               safeNumber(player2.fastestGoalTime),
+              Assets.Home.fastest_goal,
             )}
             {renderComparisonStat(
-              "🏆 PLAYER DU' MATCH",
+              "PLAYER DU' MATCH",
               player1.playerDuMatch,
               player2.playerDuMatch,
+              Assets.Home.Players_Duration,
             )}
             {renderComparisonStat(
-              '⏱ HRS PER GOAL',
+              'HRS PER GOAL',
               safeNumber(player1.hrsPerGoal),
               safeNumber(player2.hrsPerGoal),
+              Assets.Home.Hrs_Per_goal,
             )}
           </View>
         )}
 
-        {!player1 && !player2 && (
+        {(!player1 || !player2) && (
           <View style={styles.emptyCompareContainer}>
             <Text style={styles.emptyCompareText}>
               Select two players to compare their stats
@@ -541,7 +565,6 @@ const LeaderboardScreen = () => {
     );
   };
 
-  // ── dynamic period rows ─────────────────────────────────────────────
   const renderPeriodRows = () => {
     if (loadingPeriods) {
       return (
@@ -550,24 +573,18 @@ const LeaderboardScreen = () => {
         </View>
       );
     }
-
-    // short month names for the tab row
     const shortName = (m: MonthData) => m.monthName.slice(0, 3);
     const isMonthActive = (m: MonthData) =>
       activeMonth?.month === m.month && activeMonth?.year === m.year;
-
-    // weeks of the currently selected month
     const currentWeeks = activeMonth?.weeks ?? [];
 
     return (
       <>
-        {/* ── Month row ── */}
         <LinearGradient
           colors={['rgba(214,171,215,0.8)', 'rgba(57,12,89,0.5)']}
           start={{x: 0, y: 0}}
           end={{x: 1, y: 1}}
           style={styles.periodContainer}>
-          {/* ALL button */}
           <TouchableOpacity
             style={[
               styles.periodButton,
@@ -601,7 +618,6 @@ const LeaderboardScreen = () => {
           ))}
         </LinearGradient>
 
-        {/* ── Week date-range row (horizontal scroll) ── */}
         <LinearGradient
           colors={['rgba(214,171,215,0.8)', 'rgba(57,12,89,0.5)']}
           start={{x: 0, y: 0}}
@@ -640,12 +656,85 @@ const LeaderboardScreen = () => {
       </>
     );
   };
+  const renderTeamModal = () => (
+    <Modal
+      visible={teamModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setTeamModalVisible(false)}>
+      <TouchableOpacity
+        style={styles.teamModalScrim}
+        activeOpacity={1}
+        onPress={() => setTeamModalVisible(false)}>
+        <View
+          style={styles.teamModalWrapper}
+          onStartShouldSetResponder={() => true}>
+          <LinearGradient
+            colors={['#c700a6', '#6a0dad', '#ff4ecd']}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
+            style={styles.teamModalGlowBorder}>
+            <LinearGradient
+              colors={['#6912b1', '#a5218d', '#ac2090']}
+              start={{x: 0, y: 0}}
+              end={{x: 0, y: 1}}
+              style={styles.teamModalCard}>
+              <LinearGradient
+                colors={['#c700a6', '#6a0dad']}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 0}}
+                style={styles.teamModalHeaderBar}>
+                <Text style={styles.teamModalHeaderLabel}>TEAM LOGO</Text>
+                <TouchableOpacity
+                  style={styles.teamModalCloseBtn}
+                  onPress={() => setTeamModalVisible(false)}
+                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+                  <View style={styles.teamModalCloseBtnInner}>
+                    <Text style={styles.teamModalCloseTxt}>✕</Text>
+                  </View>
+                </TouchableOpacity>
+              </LinearGradient>
 
-  // ── main render ─────────────────────────────────────────────────────
+              <View style={styles.teamModalLogoSection}>
+                <View style={styles.teamModalLogoGlow} />
+                {selectedTeam && teamLogos[selectedTeam.teamName] ? (
+                  <Image
+                    source={{uri: teamLogos[selectedTeam.teamName]}}
+                    style={styles.teamModalLogo}
+                  />
+                ) : (
+                  <View style={styles.teamModalLogoFallback}>
+                    <Text style={styles.teamModalLogoFallbackText}>
+                      {selectedTeam?.teamName?.charAt(0) ?? '?'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {selectedTeam && (
+                <Text style={styles.teamModalTitle}>
+                  {formatTeamName(selectedTeam.teamName).toUpperCase()}
+                </Text>
+              )}
+
+              <LinearGradient
+                colors={['transparent', '#c700a6', 'transparent']}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 0}}
+                style={styles.teamModalDivider}
+              />
+            </LinearGradient>
+          </LinearGradient>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   return (
     <ImageBackground source={Assets.Common.background} style={styles.container}>
-      <Box flex={1} paddingTop="l">
-        {/* Tabs */}
+            <AppStatusBar />
+
+   <Box flex={1}>
         <View style={styles.tabsContainer}>
           {tabs.map(tab => (
             <TouchableOpacity
@@ -666,8 +755,6 @@ const LeaderboardScreen = () => {
         {activeTab !== 'Compare Players' && (
           <>
             {renderPeriodRows()}
-
-            {/* Table Header */}
             <LinearGradient
               colors={['rgba(214,171,215,0.8)', 'rgba(57,12,89,0.5)']}
               start={{x: 0, y: 0}}
@@ -688,7 +775,7 @@ const LeaderboardScreen = () => {
                 <Text style={styles.headerText}>Goals</Text>
               </View>
               <View style={styles.rxbpColumn}>
-                <Text style={styles.headerText}>RxBP</Text>
+                <Text style={styles.headerText}>Dribble</Text>
               </View>
             </LinearGradient>
           </>
@@ -724,7 +811,8 @@ const LeaderboardScreen = () => {
         )}
       </Box>
 
-      {/* Player Selection Modal */}
+      {/* ── Player Selection Modal ── */}
+      {renderTeamModal()}
       <Modal
         visible={showPlayerModal}
         transparent
@@ -749,23 +837,22 @@ const LeaderboardScreen = () => {
                 <TouchableOpacity
                   style={styles.modalPlayerItem}
                   onPress={() => handlePlayerSelect(item)}>
-                  <View style={styles.modalPlayerInfo}>
-                    {teamLogos[item.teamName] && (
-                      <Image
-                        source={{uri: teamLogos[item.teamName]}}
-                        style={styles.modalTeamLogo}
-                      />
-                    )}
-                    <View style={styles.modalPlayerDetails}>
-                      <Text style={styles.modalPlayerName}>{item.mrName}</Text>
-                      <Text style={styles.modalPlayerTeam}>
-                        {item.teamName}
-                      </Text>
-                    </View>
+                  {/* Left: name + HQ */}
+                  <View style={styles.modalPlayerDetails}>
+                    <Text style={styles.modalPlayerName}>{item.mrName}</Text>
+                    <Text style={styles.modalPlayerTeam}>
+                      HQ: {item.hq || 'N/A'}
+                    </Text>
                   </View>
-                  <Text style={styles.modalPlayerGoals}>
-                    {item.totalGoals} goals
-                  </Text>
+                  {/* Right: team logo */}
+                  {teamLogos[item.teamName] ? (
+                    <Image
+                      source={{uri: teamLogos[item.teamName]}}
+                      style={styles.modalTeamLogoRight}
+                    />
+                  ) : (
+                    <View style={styles.modalTeamLogoRight} />
+                  )}
                 </TouchableOpacity>
               )}
               showsVerticalScrollIndicator={false}
@@ -777,9 +864,8 @@ const LeaderboardScreen = () => {
   );
 };
 
-// ── Styles ───────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {flex: 1},
+  container: {flex: 1, backgroundColor: 'transparent'},
   tabsContainer: {
     flexDirection: 'row',
     backgroundColor: 'rgba(106,13,173,0.5)',
@@ -790,17 +876,13 @@ const styles = StyleSheet.create({
   activeTab: {borderBottomWidth: 3, borderBottomColor: '#ff3f3f'},
   tabText: {color: 'rgba(255,255,255,0.6)', fontSize: 14, fontWeight: '600'},
   activeTabText: {color: '#fff', fontWeight: 'bold'},
-
   periodContainer: {
     flexDirection: 'row',
     paddingVertical: 1,
     paddingHorizontal: 8,
     marginBottom: 3,
   },
-  weekContainer: {
-    paddingVertical: 0,
-    marginBottom: 3,
-  },
+  weekContainer: {paddingVertical: 0, marginBottom: 3},
   weekScrollContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -813,7 +895,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 4,
-    backgroundColor: '#f606f2', // pink
+    backgroundColor: '#f606f2',
   },
   player2Indicator: {
     position: 'absolute',
@@ -821,23 +903,8 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 4,
-    backgroundColor: '#9105b0', // blue
+    backgroundColor: '#9105b0',
   },
-//   player1Line: {
-//   height: 3,
-//   width: '60%',
-//   backgroundColor: '#ff4fa3',
-//   marginTop: 6,
-//   borderRadius: 3,
-// },
-
-// player2Line: {
-//   height: 3,
-//   width: '60%',
-//   backgroundColor: '#3b82f6',
-//   marginTop: 6,
-//   borderRadius: 3,
-// },
   noWeekText: {
     color: '#fff',
     fontSize: 11,
@@ -864,8 +931,6 @@ const styles = StyleSheet.create({
   },
   periodText: {color: '#fff', fontSize: 12, fontWeight: '400'},
   activePeriodText: {color: '#fff', fontWeight: 'bold', fontSize: 12},
-
-  // week buttons
   weekButton: {
     alignItems: 'center',
     paddingVertical: 4,
@@ -882,7 +947,6 @@ const styles = StyleSheet.create({
   },
   dateRangeText: {color: '#FFF', fontSize: 10, textAlign: 'center'},
   activeDateRangeText: {fontWeight: 'bold', fontSize: 11, color: '#fff'},
-
   headerText: {color: '#fff', fontSize: 10, textAlign: 'center'},
   rankColumn: {width: 40, justifyContent: 'center', alignItems: 'center'},
   playerColumn: {
@@ -894,7 +958,6 @@ const styles = StyleSheet.create({
   teamColumn: {width: 50, justifyContent: 'center', alignItems: 'center'},
   goalsColumn: {width: 50, justifyContent: 'center', alignItems: 'center'},
   rxbpColumn: {width: 60, justifyContent: 'center', alignItems: 'center'},
-
   playerRow: {
     flexDirection: 'row',
     backgroundColor: 'rgba(139,0,139,0.7)',
@@ -924,14 +987,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
   emptySubText: {color: 'rgba(255,255,255,0.6)', fontSize: 14, marginTop: 8},
-
-  // compare
   compareContainer: {flex: 1, padding: 14},
   compareHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: -35,
+    marginTop: 0,
   },
   compareHeaderImage: {width: 150, height: 40, resizeMode: 'contain'},
   playerSelectionRow: {
@@ -958,7 +1019,38 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   selectedTeamLogo: {width: 50, height: 50, resizeMode: 'contain'},
-  selectText: {color: 'rgba(255,255,255,0.6)', fontSize: 14},
+  selectPlayerImage: {
+    width: 90,
+    height: 90,
+    resizeMode: 'contain',
+    alignSelf: 'center',
+  },
+  // ── clear buttons ──
+  clearPlayerBtn: {
+    position: 'absolute',
+    top: -30,
+    right: -14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  clearPlayerBtnAbsolute: {
+    position: 'absolute',
+    top: -30,
+    right: -12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  clearPlayerTxt: {color: '#fff', fontSize: 11, fontWeight: 'bold'},
   statsComparisonContainer: {
     backgroundColor: 'rgba(42,26,46,0.5)',
     borderRadius: 7,
@@ -987,10 +1079,10 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   statLabelSport: {
-    fontFamily: 'Orbitron-Black',
+    fontFamily: 'Airstrike Bold',
     flex: 1,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: 20,
     color: '#fff',
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -1029,7 +1121,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-
   // modal
   modalOverlay: {
     flex: 1,
@@ -1061,6 +1152,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: {color: '#fff', fontSize: 18, fontWeight: 'bold'},
+  // ── updated modal row (from doc 7) ──
   modalPlayerItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1069,23 +1161,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  modalPlayerInfo: {flexDirection: 'row', alignItems: 'center', flex: 1},
-  modalTeamLogo: {
-    width: 40,
-    height: 40,
-    resizeMode: 'contain',
-    marginRight: 12,
-  },
-  modalPlayerDetails: {flex: 1},
+  modalPlayerDetails: {flex: 1, marginRight: 12},
   modalPlayerName: {color: '#fff', fontSize: 16, fontWeight: 'bold'},
   modalPlayerTeam: {color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2},
-  modalPlayerGoals: {
-    color: '#7b2ed6',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 10,
-  },
-
+  modalTeamLogoRight: {width: 40, height: 40, resizeMode: 'contain'},
   activePeriodGradient: {
     paddingVertical: 8,
     paddingHorizontal: 12,
@@ -1093,7 +1172,109 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  teamModalScrim: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  teamModalWrapper: {
+    width: width * 0.92,
+    alignItems: 'center',
+  },
+  teamModalGlowBorder: {
+    width: '100%',
+    borderRadius: 22,
+    padding: 2,
+  },
+  teamModalCard: {
+    width: '100%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    paddingBottom: 24,
+  },
+  teamModalHeaderBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  teamModalHeaderLabel: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 3,
+    opacity: 0.9,
+    padding: 4,
+    paddingBottom: 20,
+  },
+  teamModalCloseBtn: {zIndex: 100},
+  teamModalCloseBtnInner: {
+    width: 30,
+    height: 30,
+    right: 12,
+    bottom: 12,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  teamModalCloseTxt: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+    lineHeight: 16,
+  },
+  teamModalLogoSection: {
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  teamModalLogoGlow: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(199,0,166,0.15)',
+    alignSelf: 'center',
+  },
+  teamModalLogo: {
+    width: 180,
+    height: 180,
+    resizeMode: 'contain',
+  },
+  teamModalLogoFallback: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(106,13,173,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(199,0,166,0.5)',
+  },
+  teamModalLogoFallbackText: {
+    color: '#fff',
+    fontSize: 48,
+    fontWeight: '900',
+  },
+  teamModalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: 2,
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  teamModalDivider: {
+    height: 1,
+    marginHorizontal: 20,
+    marginBottom: 18,
+  },
 });
 
 export default LeaderboardScreen;
-8;

@@ -28,6 +28,9 @@ import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '../../redux/store';
 import {updateFromBackend} from '../../redux/playerSlice';
 import CustomAlert from '../Home/components/CustomAlert';
+import AppStatusBar from '../Home/components/AppStatusBar';
+
+
 const {width} = Dimensions.get('window');
 const API_URL = 'https://salessoccer.digilateral.com';
 
@@ -354,6 +357,8 @@ const Uploadscreens = () => {
   return (
     <ImageBackground source={Assets.Common.background} style={styles.container}>
       {/* ── Custom Alert ── */}
+            <AppStatusBar />
+
       <CustomAlert
         visible={alert.visible}
         type={alert.type}
@@ -474,21 +479,31 @@ const Uploadscreens = () => {
                       );
                     }
 
+                    const isNoOfUnits = key === 'noOfUnits';
+                    const isAllValue = key === 'allValue';
+
+                    const noOfUnitsFilled = !!formData['noOfUnits']?.trim();
+                    const allValueFilled = !!formData['allValue']?.trim();
+
+                    const isDisabledByMutex =
+                      (isAllValue && noOfUnitsFilled) ||
+                      (isNoOfUnits && allValueFilled);
+
+                    const isDisabled =
+                      key === 'rxnDuration' || isDisabledByMutex;
+
                     return (
                       <TextInput
                         key={key}
                         placeholder={getFieldLabel(key)}
                         placeholderTextColor="white"
-                        style={[
-                          styles.input,
-                          key === 'rxnDuration' && {opacity: 0.6},
-                        ]}
+                        style={[styles.input, isDisabled && {opacity: 0.4}]}
                         value={
                           key === 'rxnDuration'
-                            ? `${formData[key] || '1'} Default Text`
+                            ? `${formData[key] || '1'} Default Factor`
                             : formData[key] || ''
                         }
-                        editable={key !== 'rxnDuration'}
+                        editable={!isDisabled}
                         keyboardType={
                           field.type === 'number' ? 'numeric' : 'default'
                         }
@@ -499,21 +514,14 @@ const Uploadscreens = () => {
                 </Box>
 
                 {/* UPLOAD HEADER */}
-                <Box
-                  marginBottom="s"
-                  marginLeft="s"
-                  style={{marginTop: activeCategory === 'Conversion' ? 25 : 8}}>
+                <Box marginBottom="s" marginLeft="s" style={{marginTop: 8}}>
                   <RNText style={styles.headerRow}>
                     Upload Proof <RNText style={styles.requiredStar}>*</RNText>
                   </RNText>
                 </Box>
 
                 {/* UPLOAD BOX */}
-                <View
-                  style={[
-                    styles.glassContainer,
-                    activeCategory === 'Conversion' && {marginTop: 20},
-                  ]}>
+                <View style={[styles.glassContainer]}>
                   <TouchableOpacity
                     style={styles.uploadTouch}
                     activeOpacity={0.7}

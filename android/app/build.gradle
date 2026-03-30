@@ -76,15 +76,22 @@ android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
-
+    
     namespace "com.rxsoccer"
     defaultConfig {
         applicationId "com.rxsoccer"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 9
+        versionName "1.8"
     }
+
+    packagingOptions {
+    jniLibs {
+        useLegacyPackaging = false
+    }
+}
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

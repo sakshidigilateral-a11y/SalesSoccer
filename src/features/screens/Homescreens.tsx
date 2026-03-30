@@ -3,7 +3,6 @@ import {
   StyleSheet,
   ImageBackground,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   Platform,
   View,
@@ -14,6 +13,7 @@ import MatchSlider from '../Home/components/MatchSlider';
 import PlayerHeader from '../Home/components/PlayerHeader';
 import MatchSummary from '../Home/components/MatchSummary';
 import LinearGradient from 'react-native-linear-gradient';
+import AppStatusBar from '../Home/components/AppStatusBar';
 
 const {width} = Dimensions.get('window');
 
@@ -24,19 +24,14 @@ const HomeScreens = () => {
       start={{x: 0.2, y: 0}}
       end={{x: 0.8, y: 1}}
       style={styles.root}>
-
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#000"
-        translucent={false}      
-      />
-
+   
       <ImageBackground
         source={Assets.Common.background}
         style={styles.background}
         resizeMode="cover">
 
-        <SafeAreaView style={styles.safeArea}>
+        <View style={styles.safeArea}>
+           <AppStatusBar />
           <Box style={styles.container}>
             <PlayerHeader />
             <MatchSummary />
@@ -44,7 +39,7 @@ const HomeScreens = () => {
               <MatchSlider />
             </Box>
           </Box>
-        </SafeAreaView>
+        </View>
       </ImageBackground>
     </LinearGradient>
   );
@@ -59,12 +54,6 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
   },
-  safeArea: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-  },
-  container: {
-    flex: 1,
-    paddingTop: Platform.OS === 'ios' ? 0 : 20,
-  },
+ safeArea: { flex: 1 },
+  container: { flex: 1 },
 });

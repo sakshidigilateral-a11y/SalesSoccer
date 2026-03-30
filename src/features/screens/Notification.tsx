@@ -8,7 +8,9 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ImageBackground,
-  Image
+  Image,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -16,8 +18,8 @@ import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import {Assets} from '../../assets/images';
 import CustomCalendar from '../Home/components/CustomCalender';
-import { position } from '@shopify/restyle';
-
+import {position} from '@shopify/restyle';
+import AppStatusBar from '../Home/components/AppStatusBar';
 
 const API_URL = 'https://salessoccer.digilateral.com';
 const READ_IDS_KEY = 'notification_read_ids';
@@ -178,7 +180,7 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
 
   const markAllCurrentAsRead = async () => {
     const currentIds = await loadReadIds();
-    let changed = false;
+    let changed = false;69
     for (const n of notifications) {
       if (!currentIds.has(n.id)) {
         currentIds.add(n.id);
@@ -276,11 +278,11 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
               style={[styles.pillText, filter === f && styles.pillTextActive]}>
               {f === 'all' ? 'All' : f === 'goal' ? 'Goals' : 'Movement'}
             </Text>
-            {f === 'all' && totalUnread > 0 && (
+            {/* {f === 'all' && totalUnread > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{String(totalUnread)}</Text>
               </View>
-            )}
+            )} */}
           </TouchableOpacity>
         ))}
       </View>
@@ -335,6 +337,8 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
         onPress={() => handleNotificationTap(n)}
         activeOpacity={0.75}
         style={[styles.card, !read && styles.cardUnread]}>
+                <AppStatusBar />
+
         <LinearGradient
           colors={
             n.notificationType === 'goal'
@@ -347,10 +351,7 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
           {typeof icon === 'string' ? (
             <Text style={{fontSize: 12}}>{icon}</Text>
           ) : (
-            <Image
-              source={icon}
-              style={{width: 10, height: 18, }}
-            />
+            <Image source={icon} style={{width: 10, height: 18}} />
           )}
         </LinearGradient>
 
@@ -361,10 +362,11 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
             </Text>
           </View>
           <View style={styles.cardBottomRow}>
-              <Text style={styles.cardTime}>{formatTime(n.createdAt)}</Text>
             <Text style={styles.cardMessage} numberOfLines={2}>
               {n.message}
             </Text>
+            <Text style={styles.cardTime}>{formatTime(n.createdAt)}</Text>
+
             {!read && <View style={styles.unreadDot} />}
           </View>
         </View>
@@ -492,7 +494,7 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#0D0014', paddingBottom: 45},
 
-  headerGradient: {marginTop: 10, paddingVertical: 11},
+  headerGradient: { paddingVertical: 11},
   headerTitle: {
     textAlign: 'center',
     fontSize: 16,
@@ -522,11 +524,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   pillActive: {
-    backgroundColor: 'rgba(106,13,173,0.55)',
-    borderColor: 'rgba(167,139,250,0.7)',
+    // backgroundColor: 'rgba(235, 230, 238, 0.55)',
+     borderColor: 'rgba(167,139,250,0.7)',
   },
-  pillText: {color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: '600'},
-  pillTextActive: {color: 'rgba(220,9,220,0.9)'},
+  pillText: {color: 'rgba(255,255,255,0.65)', fontFamily:'Airstrike Bold'},
+  pillTextActive: {fontFamily: 'Airstrike Bold'},
   badge: {
     backgroundColor: '#e14593',
     borderRadius: 9,
@@ -551,7 +553,7 @@ const styles = StyleSheet.create({
   },
   calBtnActive: {
     backgroundColor: 'rgba(225,69,147,0.25)',
-    borderColor: 'rgba(225,69,147,0.7)',
+    borderColor: 'rgba(240, 61, 151, 0.7)',
   },
   calBtnText: {color: '#fff', fontSize: 11, fontWeight: '600'},
 
@@ -584,7 +586,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(225,69,147,0.35)',
   },
   datePillText: {
-    color: '#e14593',
+    color: '#e44896',
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -609,7 +611,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
-    marginTop: 20,
+    marginTop: 10,
     flexShrink: 0,
     overflow: 'hidden',
   },
@@ -620,10 +622,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#fff',
-    marginRight: 6,
+    marginRight: 50,
   },
-  cardTime: {fontSize: 10, color: 'rgba(255,255,255,0.4)', flexShrink: 0,right:4, position:'absolute'},
-  cardBottomRow: {flexDirection: 'row', alignItems: 'flex-end'},
+  cardTime: {
+    width: 45,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.4)',
+    textAlign: 'right',
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
   cardMessage: {
     flex: 1,
     fontSize: 12,

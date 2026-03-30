@@ -25,9 +25,11 @@ import {RootState} from '@reduxjs/toolkit/query';
 import io, {Socket} from 'socket.io-client';
 import {Text as RNText} from 'react-native';
 
-const {width} = Dimensions.get('window');
-const cardWidth = width * 0.88;
-const CARD_SPACING = 1;
+const {width, height} = Dimensions.get('window');
+const SIDE_PEEK = 20;
+const CARD_SPACING = 8;
+const cardWidth = width - SIDE_PEEK * 3;
+const CARD_HEIGHT = Math.min(Math.max(height * 0.38, 260), 350);
 const API_URL = 'https://salessoccer.digilateral.com';
 
 interface MRUpload {
@@ -113,6 +115,77 @@ interface MatchDetailModalProps {
   formatTeamName: (name: string) => string;
 }
 
+const MarqueeText = ({text, style}: {text: string; style?: any}) => {
+  const shouldScroll = text.length > 16;
+  const pos = useRef(new Animated.Value(0)).current;
+  const [w, setW] = useState(120);
+
+  useEffect(() => {
+    if (!shouldScroll) return;
+    pos.setValue(0);
+    Animated.loop(
+      Animated.timing(pos, {
+        toValue: -w,
+        duration: 3000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ).start();
+    return () => pos.stopAnimation();
+  }, [shouldScroll, w]);
+
+  if (!shouldScroll) {
+    return (
+      <View style={{flex: 1, overflow: 'hidden'}}>
+        <Animated.Text numberOfLines={1} style={[style, {flexShrink: 0}]}>
+          {text}
+        </Animated.Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{flex: 1, overflow: 'hidden'}}>
+      {/* invisible spacer to hold height */}
+      <Text style={[style, {opacity: 0}]} numberOfLines={1}>
+        {text}
+      </Text>
+      {/* copy 1 */}
+      <Animated.Text
+        numberOfLines={1}
+        ellipsizeMode="clip"
+        onLayout={e => setW(e.nativeEvent.layout.width + 30)}
+        style={[
+          style,
+          {
+            position: 'absolute',
+            top: 0,
+            transform: [{translateX: pos}],
+          },
+        ]}>
+        {text}
+      </Animated.Text>
+      {/* copy 2 — always w px ahead of copy 1 */}
+      <Animated.Text
+        numberOfLines={1}
+        ellipsizeMode="clip"
+        style={[
+          style,
+          {
+            position: 'absolute',
+            top: 0,
+            transform: [
+              {
+                translateX: Animated.add(pos, new Animated.Value(w)) as any,
+              },
+            ],
+          },
+        ]}>
+        {text}
+      </Animated.Text>
+    </View>
+  );
+};
 // ─── UPDATED MatchDetailModal — matches new scoreboard design ────────────────
 const MatchDetailModal = ({
   visible,
@@ -172,7 +245,7 @@ const MatchDetailModal = ({
         {/* Decorative blobs in background */}
 
         {/* Card container */}
-        <View style={D.card}>         
+        <View style={D.card}>
           {/* ── Header: date row ── */}
           <View style={D.headerDateRow}>
             <RNText style={D.headerDate}>
@@ -180,7 +253,7 @@ const MatchDetailModal = ({
             </RNText>
             <RNText style={D.matchBadgeText}>
               {`Match ${match.matchId}`}
-              {status === 'active' ? '  🔴' : ''}
+              {status === 'active' ? '  ' : ''}
             </RNText>
             <RNText style={D.headerDate}>{fmtHeaderDate(match.endTime)}</RNText>
           </View>
@@ -222,7 +295,7 @@ const MatchDetailModal = ({
             <RNText style={D.winnerText}>{winnerText}</RNText>
           )}
           {status === 'active' && (
-            <RNText style={D.winnerText}>{'🔴 Match is Live'}</RNText>
+            <RNText style={D.winnerText}>{'🟢 Match is Live'}</RNText>
           )}
 
           {/* ── Tab switcher ── */}
@@ -273,11 +346,11 @@ const MatchDetailModal = ({
           {/* ── Column headers ── */}
           <View style={D.colRow}>
             <RNText style={[D.colTxt, {flex: 3, textAlign: 'left'}]}>
-              {'Players Name'}
+              {'Player Name'}
             </RNText>
             <RNText style={D.colTxt}>{'⏱'}</RNText>
             <RNText style={D.colTxt}>{'Goals'}</RNText>
-            <RNText style={D.colTxt}>{'RxBP'}</RNText>
+            <RNText style={D.colTxt}>{'Drimbble'}</RNText>
           </View>
 
           {/* ── Player list ── */}
@@ -303,10 +376,7 @@ const MatchDetailModal = ({
                       <RNText style={D.playerNum}>
                         {String(index + 1).padStart(2, '0') + '.'}
                       </RNText>
-                      <RNText style={D.playerName} numberOfLines={1}>
-                        {item.mrName}
-                      </RNText>
-                      {isTopUploader && <RNText style={D.crown}>👑</RNText>}
+                      <MarqueeText text={item.mrName} style={D.playerName} />
                     </View>
                     <RNText style={[D.cellTxt, hasTime && D.timeTxt]}>
                       {hasTime ? fmtTime(item.lastUploadTime) : ''}
@@ -558,7 +628,7 @@ const D = StyleSheet.create({
   },
   playerNum: {
     color: 'rgba(255,255,255,0.75)',
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '700',
     fontStyle: 'italic',
     width: 30,
@@ -580,7 +650,7 @@ const D = StyleSheet.create({
   centerBox: {height: 160, justifyContent: 'center', alignItems: 'center'},
   emptyTxt: {color: 'rgba(255,255,255,0.5)', fontSize: 13, fontStyle: 'italic'},
   crown: {fontSize: 13, marginLeft: 3},
-  timeTxt: {color: '#fff', fontWeight: '700'},
+  timeTxt: {color: '#fff'},
 
   // ── Close button ──
   closeBtn: {
@@ -625,6 +695,7 @@ const MatchSlider = () => {
   const token = useSelector((state: RootState) => state.auth.token);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
   const [voteMessage, setVoteMessage] = useState('');
+  const lastTapMap = useRef<{[key: string]: number}>({}).current;
 
   useEffect(() => {
     fetchAllMatches();
@@ -884,7 +955,7 @@ const MatchSlider = () => {
           showsHorizontalScrollIndicator={false}
           snapToInterval={cardWidth + CARD_SPACING}
           decelerationRate="fast"
-          contentContainerStyle={{paddingHorizontal: (width - cardWidth) / 2.3}}
+          contentContainerStyle={{paddingHorizontal: SIDE_PEEK}}
           onScroll={Animated.event(
             [{nativeEvent: {contentOffset: {x: scrollX}}}],
             {useNativeDriver: true},
@@ -982,8 +1053,14 @@ const MatchSlider = () => {
                         const wrapperProps = isTappable
                           ? {
                               activeOpacity: 0.75,
-                              onPress: () =>
-                                openDetailModal(match, item.status),
+                              onPress: () => {
+                                const now = Date.now();
+                                const last = lastTapMap[match.id] || 0;
+                                if (now - last < 300) {
+                                  openDetailModal(match, item.status);
+                                }
+                                lastTapMap[match.id] = now;
+                              },
                             }
                           : {};
 
@@ -1020,9 +1097,7 @@ const MatchSlider = () => {
                             </View>
 
                             <View style={styles.center}>
-                              {item.status !== 'upcoming' && (
-                                <Text style={styles.goalsLabel}>GOALS</Text>
-                              )}
+                              {item.status === 'upcoming' && null}
 
                               {item.status === 'upcoming' ? (
                                 (() => {
@@ -1067,15 +1142,22 @@ const MatchSlider = () => {
                               ) : (
                                 <View style={styles.scoreContainer}>
                                   <View style={styles.scoreRow}>
-                                    <Text style={styles.bigScore}>
+                                    <RNText
+                                      style={styles.bigScore}
+                                      numberOfLines={1}
+                                      adjustsFontSizeToFit>
                                       {teamA?.goals || 0}
-                                    </Text>
-                                    <Text style={styles.scoreSeparator}>:</Text>
-                                    <Text style={styles.bigScore}>
+                                    </RNText>
+                                    <RNText style={styles.scoreSeparator}>
+                                      :
+                                    </RNText>
+                                    <RNText
+                                      style={styles.bigScore}
+                                      numberOfLines={1}
+                                      adjustsFontSizeToFit>
                                       {teamB?.goals || 0}
-                                    </Text>
+                                    </RNText>
                                   </View>
-
                                   {item.status === 'completed' && (
                                     <Text style={styles.winnerText}>
                                       {winnerText}
@@ -1164,50 +1246,63 @@ const MatchSlider = () => {
             {selectedMatch && (
               <>
                 <View style={styles.checkboxRow}>
-                  {[0, 1].map(idx => (
-                    <TouchableOpacity
-                      key={idx}
-                      disabled={voting || alreadyVoted[selectedMatch?.id || '']}
-                      style={[
-                        styles.checkboxTeamCard,
-                        selectedTeamId === selectedMatch.teams[idx].flmId &&
-                          styles.checkboxTeamCardSelected,
-                        (voting || alreadyVoted[selectedMatch?.id || '']) && {
-                          opacity: 0.5,
-                        },
-                      ]}
-                      onPress={() =>
-                        setSelectedTeamId(selectedMatch.teams[idx].flmId)
-                      }>
-                      <Image
-                        source={
-                          teamLogos[selectedMatch.teams[idx]?.teamName]
-                            ? {
-                                uri: teamLogos[
-                                  selectedMatch.teams[idx].teamName
-                                ],
-                              }
-                            : idx === 0
-                            ? Assets.Home.Banglore
-                            : Assets.Home.Bhopal
-                        }
-                        style={styles.voteLogo}
-                      />
-                      <RNText style={styles.voteTeamName}>
-                        {formatTeamName(selectedMatch.teams[idx]?.teamName)}
-                      </RNText>
-                      <View
+                  {[0, 1].map(idx => {
+                    const isSelected =
+                      selectedTeamId === selectedMatch.teams[idx].flmId;
+                    const isDisabled =
+                      voting || alreadyVoted[selectedMatch?.id || ''];
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        disabled={isDisabled}
                         style={[
-                          styles.checkbox,
-                          selectedTeamId === selectedMatch.teams[idx].flmId &&
-                            styles.checkboxChecked,
-                        ]}>
-                        {selectedTeamId === selectedMatch.teams[idx].flmId && (
-                          <RNText style={styles.checkmark}>✓</RNText>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                          styles.checkboxTeamCard,
+                          isSelected && styles.checkboxTeamCardSelected,
+                          isDisabled && {opacity: 0.5},
+                        ]}
+                        onPress={() =>
+                          setSelectedTeamId(selectedMatch.teams[idx].flmId)
+                        }
+                        activeOpacity={0.8}>
+                        {/* Logo with tick overlay */}
+                        <View style={{position: 'relative'}}>
+                          <Image
+                            source={
+                              teamLogos[selectedMatch.teams[idx]?.teamName]
+                                ? {
+                                    uri: teamLogos[
+                                      selectedMatch.teams[idx].teamName
+                                    ],
+                                  }
+                                : idx === 0
+                                ? Assets.Home.Banglore
+                                : Assets.Home.Bhopal
+                            }
+                            style={{
+                              width: 82,
+                              height: 82,
+                              resizeMode: 'contain',
+                              borderRadius: 26,
+                            }}
+                          />
+                          {isSelected && (
+                            <View style={styles.logoTick}>
+                              <RNText style={styles.logoTickText}>✓</RNText>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Team name */}
+                        <RNText
+                          style={[
+                            styles.voteTeamName,
+                            {flex: 1, textAlign: 'left', fontSize: 15},
+                          ]}>
+                          {formatTeamName(selectedMatch.teams[idx]?.teamName)}
+                        </RNText>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
                 <TouchableOpacity
                   disabled={
@@ -1290,41 +1385,59 @@ const styles = StyleSheet.create({
     marginHorizontal: CARD_SPACING / 2,
     marginTop: 30,
   },
-  card: {borderRadius: 32, paddingTop: 6, paddingHorizontal: 6, height: 350},
-  scrollView: {flex: 1},
-  matchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.2)',
+  card: {
+    borderRadius: 32,
+    paddingTop: 6,
+    paddingHorizontal: 6,
+    minHeight: 330,
+    maxHeight: height * 0.9,
   },
+ scrollView: {flex: 1, flexGrow: 1},
+  // matchRow: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   paddingVertical: 8,
+  //   borderBottomWidth: 0.5,
+  //   borderColor: 'rgba(255,255,255,0.2)',
+  // },
   teamSide: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  center: {flex: 2, alignItems: 'center', justifyContent: 'center'},
-  scoreContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bigScore: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    marginHorizontal: 4,
-  },
-  scoreSeparator: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '900',
-    fontStyle: 'italic',
-    opacity: 0.7,
-  },
+ center: {flex: 2, alignItems: 'center', justifyContent: 'center', overflow: 'visible'},
+scoreContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 6,
+  minWidth: 110,
+  overflow: 'visible',
+},
+scoreRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  overflow: 'visible',
+},
+bigScore: {
+  color: '#fff',
+  fontSize: Math.min(28, width * 0.065),
+  fontWeight: '900',
+  fontStyle: 'italic',
+  marginHorizontal: 2,
+  minWidth: 24,
+  textAlign: 'center',
+},
+scoreSeparator: {
+  color: '#fff',
+  fontSize: Math.min(32, width * 0.075),
+  fontWeight: '900',
+  fontStyle: 'italic',
+  opacity: 0.7,
+},
+matchRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingVertical: Math.max(5, height * 0.008), // responsive vertical padding
+  borderBottomWidth: 0.5,
+  borderColor: 'rgba(255,255,255,0.2)',
+},
   pollCloseBtn: {
     position: 'absolute',
     top: 10,
@@ -1396,7 +1509,7 @@ const styles = StyleSheet.create({
   },
   shadowContainer: {borderRadius: 50, alignSelf: 'center'},
   shadowRadius: {borderRadius: 50, width: 45, height: 45},
-  logo: {width: 48, height: 48, resizeMode: 'contain'},
+ logo: {width: Math.min(48, width * 0.11), height: Math.min(48, width * 0.11), resizeMode: 'contain'},
   emptyContainer: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   emptyText: {color: '#fff', fontSize: 14, fontStyle: 'italic', opacity: 0.7},
   modalContainer: {flex: 1, justifyContent: 'center', alignItems: 'center'},
@@ -1415,19 +1528,37 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   checkboxRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
+    flexDirection: 'column',
+    width: '100%',
+    gap: 12,
     marginBottom: 20,
   },
   checkboxTeamCard: {
-    flex: 1,
+    width: '92%',
+    left: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.4)',
     backgroundColor: 'rgba(255,255,255,0.15)',
+    gap: 14,
+  },
+  logoTick: {
+    position: 'absolute',
+    top: 40,
+    right: 30,
+    backgroundColor: '#2E8B57',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoTickText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   checkboxTeamCardSelected: {
     borderColor: '#fff',

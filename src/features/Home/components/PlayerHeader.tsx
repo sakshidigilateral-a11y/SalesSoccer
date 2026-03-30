@@ -1,5 +1,11 @@
 import React, {useEffect, useState, useRef} from 'react';
-import {Image, StyleSheet, ActivityIndicator, View} from 'react-native';
+import {
+  Image,
+  StyleSheet,
+  ActivityIndicator,
+  View,
+  Dimensions,
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as RNFS from 'react-native-fs';
 import {Box, Text} from '../../../components/themes';
@@ -7,7 +13,7 @@ import {Assets} from '../../../assets/images';
 import Svg, {Path, Text as SvgText, TextPath} from 'react-native-svg';
 import axios from 'axios';
 import io, {Socket} from 'socket.io-client';
-import {useDispatch, useSelector} from 'react-redux'; // ✅ Add useSelector
+import {useDispatch, useSelector} from 'react-redux';
 import {
   setPlayerStats,
   setLoading as setLoadingAction,
@@ -15,10 +21,11 @@ import {
   updatePossessionCount,
   updateGoalCount,
 } from '../../../redux/playerSlice';
-import {AppDispatch, RootState} from '../../../redux/store'; // ✅ Add RootState
+import {AppDispatch, RootState} from '../../../redux/store';
 import LinearGradient from 'react-native-linear-gradient';
 
 const API_URL = 'https://salessoccer.digilateral.com';
+const {width: SW, height: SH} = Dimensions.get('window');
 
 interface PlayerStats {
   mrName: string;
@@ -37,19 +44,14 @@ interface PlayerStats {
 
 const PlayerHeader = () => {
   const dispatch = useDispatch<AppDispatch>();
-
-  // ✅ Get loading and stats from Redux instead of local state
   const {stats, loading} = useSelector((state: RootState) => state.player);
   const {mrId, role} = useSelector((state: RootState) => state.auth);
   console.log('ressssssssssss:', stats);
   const [teamLogoUri, setTeamLogoUri] = useState<string | null>(null);
-  // const [mrId, setMrId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  // const FONT_SIZE = 25;
   const TOP_Y = 70;
   const CURVE_HEIGHT = 30;
-  // const GAP = FONT_SIZE * 1.5;
   const TOP_OFFSET = 10;
   const GAP = 40;
 
@@ -66,8 +68,6 @@ const PlayerHeader = () => {
 
   const initializeSocket = async () => {
     try {
-      // const userData = await AsyncStorage.getItem('userData');
-      // const res = JSON.parse(userData || '{}');
       const userId = mrId;
 
       console.log('socket idddddddddddddddddd', userId);
@@ -76,8 +76,6 @@ const PlayerHeader = () => {
         console.error('No user ID found for socket connection');
         return;
       }
-
-      // setMrId(userId);
 
       socketRef.current = io(API_URL, {
         transports: ['websocket'],
@@ -91,80 +89,55 @@ const PlayerHeader = () => {
         socketRef.current?.emit('joinMR', userId);
       });
 
-      // ✅ Listen for upload created (handles both goals AND possession)
       socketRef.current.on('uploadCreated', data => {
         console.log('Upload created received:', data);
-
-        // Check if this upload belongs to current user
         if (data.mrId !== userId) return;
-
-        // Update goal count if available
-        // if (data.individualMrGoalCount !== undefined) {
-        //   console.log('Updating goal count to:', data.individualMrGoalCount);
-        //   fetchPlayerStats();
-        // }
-
-        // Update possession/rxn count if available
         if (data.rxCount !== undefined) {
           console.log('Updating possession count to:', data.rxCount);
         }
       });
 
-      // ✅ Listen for upload status changes (when boss approves/rejects)
       socketRef.current.on('uploadStatusChanged', data => {
         console.log('Upload status changed:', data);
-
         if (data.mrId !== userId) return;
-
         if (data.status === 'approved') {
-          // Refresh full stats when upload is approved
           console.log('Upload approved, refreshing stats...');
           fetchPlayerStats();
         }
       });
 
-      // ✅ Listen for goal updates
       socketRef.current.on('goalUpdate', data => {
         console.log('Goal update received:', data);
-
-        // If this event has individual MR data, update it
         if (data.mrId === userId && data.goalCount !== undefined) {
           dispatch(updateGoalCount(data.goalCount));
         }
       });
 
-      // ✅ Listen for possession updates
       socketRef.current.on('possessionUpdate', data => {
         console.log('Possession update received:', data);
-
         if (data.mrId === userId && data.possessionCount !== undefined) {
           dispatch(updatePossessionCount(data.possessionCount));
         }
       });
 
-      // ✅ Listen for match stats updates (full stats refresh)
       socketRef.current.on('matchStatsUpdate', data => {
         console.log('Match stats update received:', data);
-
         if (data.playerStats) {
           dispatch(setPlayerStats(data.playerStats));
         }
       });
 
-      // ✅ Listen for match completion
       socketRef.current.on('matchCompleted', data => {
         console.log('Match completed:', data);
         fetchPlayerStats();
       });
 
-      // ✅ Listen for direct player stats update
       socketRef.current.on('playerStatsUpdate', data => {
         if (data.mrId !== userId) return;
-
         console.log('🔥 LIVE STATS UPDATE:', data.stats);
-
         dispatch(setPlayerStats(data.stats));
       });
+
       socketRef.current.on('disconnect', () => {
         console.log('Socket disconnected');
       });
@@ -181,7 +154,6 @@ const PlayerHeader = () => {
     try {
       dispatch(setLoadingAction(true));
 
-      // ✅ Use Redux auth state instead of AsyncStorage
       if (!mrId || !role) {
         console.error('No user ID or role found in Redux');
         dispatch(setError('User not authenticated'));
@@ -197,6 +169,15 @@ const PlayerHeader = () => {
       if (response.data.success) {
         const playerData = response.data.data;
         dispatch(setPlayerStats(playerData));
+        console.log(
+          '=== API RESPONSE KEYS..................... ===',
+          playerData,
+        );
+        console.log(
+          '=== FULL API DATA ===',
+          JSON.stringify(playerData, null, 2),
+        );
+
         await loadTeamLogo(playerData.teamName);
       }
     } catch (error) {
@@ -207,38 +188,22 @@ const PlayerHeader = () => {
     }
   };
 
-  // const getTextOffset = (text: string, isFirstLine: boolean = true) => {
-  //   const textLength = text.length;
-
-  //   if (isFirstLine) {
-  //    if (textLength <= 3) return '50%';
-  //     if (textLength <= 6) return '30%';
-  //     if (textLength <= 10) return '12%';
-  //     return '5%';
-  //   }
-
-  //   if (textLength <= 3) return '45%';
-  //   if (textLength <= 6) return '20%';
-  //   if (textLength <= 10) return '10%';
-  //   return '10%';
-  // };
   const getDynamicFontSize = (text: string) => {
     const length = text.length;
-
     if (length <= 8) return 25;
     if (length <= 12) return 21;
     if (length <= 16) return 18;
     if (length <= 20) return 16;
-    return 14; // very long names
+    return 14;
   };
 
   const getDynamicLetterSpacing = (text: string) => {
     return text.length > 14 ? 0 : 1;
   };
+
   const loadTeamLogo = async (teamName: string) => {
     try {
       const logoPath = `${RNFS.DocumentDirectoryPath}/DIGI/200x200/${teamName}.png`;
-
       if (await RNFS.exists(logoPath)) {
         setTeamLogoUri(`file://${logoPath}`);
         console.log('✅ Team logo loaded:', teamName);
@@ -254,20 +219,23 @@ const PlayerHeader = () => {
     console.log('Full Name:', fullName);
     const parts = fullName.trim().split(' ');
     if (parts.length === 1) {
-      return {firstName: parts[0], lastName: ''};
+      return {firstName: parts[0], middleName: '', lastName: ''};
     }
-    const firstName = parts.slice(0, -1).join(' ');
-    const lastName = parts[parts.length - 1];
-    return {firstName, lastName};
+    if (parts.length === 2) {
+      return {firstName: parts[0], middleName: '', lastName: parts[1]};
+    }
+    return {
+      firstName: parts[0],
+      middleName: parts.slice(1, -1).join(' '),
+      lastName: parts[parts.length - 1],
+    };
   };
 
   const formatTeamName = (teamName?: string | null) => {
     if (!teamName) return '';
-
     return teamName.replace(/([a-z])([A-Z])/g, '$1\n$2').toUpperCase();
   };
 
-  // ✅ Now loading comes from Redux
   if (loading) {
     return (
       <Box
@@ -284,7 +252,6 @@ const PlayerHeader = () => {
     );
   }
 
-  // ✅ Now stats comes from Redux
   if (!stats) {
     return (
       <Box
@@ -298,12 +265,17 @@ const PlayerHeader = () => {
     );
   }
 
-  const {firstName, lastName} = getNameParts(
+  const {firstName, middleName, lastName} = getNameParts(
     stats.mrName || stats.flmName || '',
   );
   const firstFontSize = getDynamicFontSize(firstName);
   const lastFontSize = getDynamicFontSize(lastName);
   const formattedTeamName = formatTeamName(stats.teamName);
+
+  const svgFontTop =
+    firstName.length > 12 ? 17 : firstName.length > 8 ? 21 : 26;
+  const svgFontBottom =
+    lastName.length > 12 ? 17 : lastName.length > 8 ? 21 : 26;
 
   return (
     <Box padding="xs" style={{marginTop: '-10%'}}>
@@ -311,7 +283,7 @@ const PlayerHeader = () => {
       <Box flexDirection="row" alignItems="center">
         <Box
           width="110%"
-          height={120}
+          height={SH * 0.2}
           style={{marginLeft: -10}}
           overflow="hidden"
           justifyContent="flex-start">
@@ -320,72 +292,110 @@ const PlayerHeader = () => {
             style={styles.jerseyBase}
             resizeMode="contain"
           />
+
           {/* NAME ON JERSEY */}
           <View
             style={{
               position: 'absolute',
-              top: '25%',
+              top: SH * 0.055,
               left: '-10%',
               width: '76%',
               alignItems: 'center',
+              justifyContent: 'center',
             }}>
-            {(firstName + lastName).length > 18 ? (
-              // LONG NAME → STRAIGHT TEXT
-              <Text
-                style={{
-                  textAlign: 'center',
-                  fontWeight: '900',
-                  fontStyle: 'italic',
-                  color: '#8B0000',
-                  fontSize: 30,
-                }}>
-                {(firstName + ' ' + lastName).toUpperCase()}
-              </Text>
-            ) : (
-              // SHORT NAME → CURVED SVG
-              <Svg viewBox="0 0 400 220" width="100%" height={120}>
-                {/* More aggressive curve */}
-                <Path
-                  id="curveTop"
-                  d="M 20,120 Q 200,20 380,120"
-                  fill="transparent"
-                />
+            {(() => {
+              const fullName = (stats.mrName || stats.flmName || '')
+                .toUpperCase()
+                .trim();
 
-                <Path
-                  id="curveBottom"
-                  d="M 40,165 Q 200,60 360,165"
-                  fill="transparent"
-                />
-                <SvgText
-                  fill="#8B0000"
-                  fontSize={26}
-                  fontWeight="900"
-                  fontStyle="italic"
-                  textAnchor="middle">
-                  <TextPath href="#curveTop" startOffset="50%">
-                    {firstName.toUpperCase()}
-                  </TextPath>
-                </SvgText>
+              const splitNameIntoLines = (name: string, maxChars = 12) => {
+                const words = name.split(' ');
+                const lines: string[] = [];
+                let currentLine = '';
 
-                {lastName ? (
-                  <SvgText
-                    fill="#8B0000"
-                    fontSize={26}
-                    fontWeight="900"
-                    fontStyle="italic"
-                    textAnchor="middle">
-                    <TextPath href="#curveBottom" startOffset="50%">
-                      {lastName.toUpperCase()}
-                    </TextPath>
-                  </SvgText>
-                ) : null}
-              </Svg>
-            )}
+                words.forEach(word => {
+                  if ((currentLine + ' ' + word).trim().length > maxChars) {
+                    lines.push(currentLine.trim());
+                    currentLine = word;
+                  } else {
+                    currentLine += ' ' + word;
+                  }
+                });
+
+                if (currentLine) lines.push(currentLine.trim());
+                return lines.slice(0, 4);
+              };
+
+              const nameLines = splitNameIntoLines(fullName);
+              const lineCount = nameLines.length;
+
+              const jerseyFontSize =
+                lineCount === 1
+                  ? 22
+                  : lineCount === 2
+                  ? 21
+                  : lineCount === 3
+                  ? 20
+                  : 19;
+
+              // Compact spacing
+              const topY = 65; // top limit of name area
+              const bottomY = 115; // bottom limit of name area
+
+              const availableHeight = bottomY - topY;
+              const gap = lineCount > 1 ? availableHeight / (lineCount - 1) : 0;
+
+              const startY = lineCount === 1 ? 90 : topY;
+
+              const getCurvePaths = () => {
+                const paths = [];
+
+                const centerY = 105; // center of jersey text area
+                const lineSpacing = 28; // space between lines (adjust this)
+                const totalHeight = (lineCount - 1) * lineSpacing;
+                const startY = centerY - totalHeight / 2;
+
+                for (let i = 0; i < lineCount; i++) {
+                  const y = startY + i * lineSpacing;
+
+                  // Curved jersey arc
+                  paths.push(`M 30,${y} Q 200,${y - 45} 370,${y}`);
+                }
+
+                return paths;
+              };
+              const curvePaths = getCurvePaths();
+
+              return (
+                <Svg viewBox="0 0 400 200" width="100%" height={120}>
+                  {curvePaths.map((d, i) => (
+                    <Path key={i} id={`curve${i}`} d={d} fill="transparent" />
+                  ))}
+
+                  {nameLines.map((line, i) => (
+                    <SvgText
+                      key={i}
+                      fill="#8B0000"
+                      fontSize={jerseyFontSize}
+                      fontWeight="900"
+                      fontStyle="italic"
+                      textAnchor="middle"
+                      transform="skewX(-5)">
+                      <TextPath href={`#curve${i}`} startOffset="50%">
+                        {line}
+                      </TextPath>
+                    </SvgText>
+                  ))}
+                </Svg>
+              );
+            })()}
           </View>
+
+          {/* HQ TEXT */}
           <Text
             style={{
               position: 'absolute',
-              top: 20,
+              top: SH * 0.04,
               left: 65,
               width: '100%',
               textAlign: 'center',
@@ -396,28 +406,34 @@ const PlayerHeader = () => {
             }}>
             HQ: {stats.hq || 'N/A'}
           </Text>
+
           {/* TEAM LOGO */}
           {teamLogoUri ? (
-            <Image
-              source={{uri: teamLogoUri}}
-              resizeMode="contain"
-              style={styles.jerseyLogo}
-            />
+            <View style={styles.jerseyLogoCircle}>
+              <Image
+                source={{uri: teamLogoUri}}
+                resizeMode="contain"
+                style={styles.jerseyLogo}
+              />
+            </View>
           ) : (
-            <Image
-              source={Assets.Home.Tshirt_logo}
-              resizeMode="stretch"
-              style={styles.jerseyLogo}
-            />
+            <View style={styles.jerseyLogoCircle}>
+              <Image
+                source={Assets.Home.Tshirt_logo}
+                resizeMode="stretch"
+                style={styles.jerseyLogo}
+              />
+            </View>
           )}
 
+          {/* TEAM NAME */}
           <Text
             variant="header"
-            fontSize={10}
+            fontSize={12}
             fontStyle="italic"
             fontWeight="900"
             position="absolute"
-            top={71}
+            top={SH * 0.1}
             left={65}
             width="100%"
             textAlign="center"
@@ -431,20 +447,11 @@ const PlayerHeader = () => {
         colors={['#c997ba99', '#c593b899', '#c293b499']}
         start={{x: 0, y: 0}}
         end={{x: 1, y: 0}}
-        style={styles.infoRow}>
+        style={[styles.infoRow, {marginTop: -SH * 0.03}]}>
         <Text style={styles.infoText}>Region: {stats.region || 'N/A'}</Text>
-
-        <Text style={styles.infoText}>Area: {stats.area || 'N/A'}</Text>
-
+        {/* <Text style={styles.infoText}>Area: {stats.area || 'N/A'}</Text> */}
         <Text style={styles.infoText}>Zone: {stats.zone || 'N/A'}</Text>
       </LinearGradient>
-
-      {/* <View
-        style={{
-          borderBottomColor: '#eaeaea',
-          borderBottomWidth: 0.2,
-          marginTop: 3,
-        }}></View> */}
 
       {/* Stats Section */}
       <View style={styles.statsContainer}>
@@ -464,22 +471,26 @@ const PlayerHeader = () => {
               <Text style={[styles.statLabel, {fontWeight: 'bold'}]}>
                 GOALS
               </Text>
-              <Text style={styles.statValueLarge1}>{stats.totalGoals}</Text>
+              <Text style={styles.statValueLarge1}>
+                {Math.min(stats.totalGoals, 999)}
+              </Text>
             </View>
 
             <View style={{alignItems: 'center', marginTop: 0}}>
               <Text style={styles.statLabel2}>Average Goals</Text>
               <Text style={styles.statSubLabel2}>Per Match</Text>
-
               <Text style={styles.statValueLarge}>
                 {stats.totalMatches > 0
-                  ? (stats.totalGoals / stats.totalMatches).toFixed(2)
-                  : '0'}
+                  ? (() => {
+                      const avg = stats.totalGoals / stats.totalMatches;
+                      return avg >= 3 ? '2.99' : avg.toFixed(2);
+                    })()
+                  : '0.00'}
               </Text>
             </View>
           </View>
 
-          {/* Average Goals */}
+          {/* Matches + WLD */}
           <View
             style={[
               styles.statBox,
@@ -568,9 +579,13 @@ const PlayerHeader = () => {
           {/* Ball Possession */}
           <View style={styles.miniStatBox}>
             <Text style={styles.miniStatValue}>
-              {stats.totalApprovedUploads}
+              {typeof stats.totalApprovedUploads === 'number'
+                ? Math.min(Math.floor(stats.totalApprovedUploads), 999)
+                : typeof stats.ballPossession === 'number'
+                ? Math.min(Math.floor(stats.ballPossession), 999)
+                : '-'}
             </Text>
-            <Text style={styles.miniStatLabel}>Ball Possession</Text>
+            <Text style={styles.miniStatLabel}>Dribble</Text>
           </View>
 
           {/* Fastest Goal */}
@@ -582,9 +597,10 @@ const PlayerHeader = () => {
                 style={styles.fastestgoal}
               />
               <Text style={styles.miniStatValue}>
-                {typeof stats.fastestGoalTime === 'number'
-                  ? Math.floor(stats.fastestGoalTime)
-                  : '-'}
+                {stats?.fastestGoalTime ??
+                  stats?.fastestGoal ??
+                  stats?.minGoalTime ??
+                  '-'}
               </Text>
               <Text style={styles.unitText}>Hrs</Text>
             </View>
@@ -600,11 +616,26 @@ const PlayerHeader = () => {
                 style={styles.HrsPergoal}
               />
               <Text style={styles.miniStatValue}>
-                {typeof stats.averageTimePerGoal === 'number'
-                  ? Math.min(Math.floor(stats.averageTimePerGoal), 999)
-                  : '-'}
+                {(() => {
+                  if (stats.averageTimePerGoal != null) {
+                    return Math.min(
+                      Math.floor(Number(stats.averageTimePerGoal)),
+                      999,
+                    );
+                  }
+                  if (
+                    stats.totalMatches > 0 &&
+                    stats.totalGoals > 0 &&
+                    stats.fastestGoalTime != null
+                  ) {
+                    const avg =
+                      (Number(stats.fastestGoalTime) * stats.totalMatches) /
+                      stats.totalGoals;
+                    return Math.min(Math.floor(avg), 999);
+                  }
+                  return '-';
+                })()}
               </Text>
-              {/* <Text style={styles.unitText}>Hrs</Text> */}
             </View>
             <Text style={styles.miniStatLabel}>Hrs per Goal</Text>
           </View>
@@ -630,18 +661,29 @@ const PlayerHeader = () => {
 const styles = StyleSheet.create({
   jerseyBase: {
     width: '100%',
-    height: '150%',
+    height: '100%',
     alignSelf: 'center',
-    marginTop: -25,
-    // marginLeft: -5,
+    marginTop: 0,
+  },
+  jerseyLogoCircle: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    top: '35%',
+    right: '8%',
+    borderRadius: 40,
+    backgroundColor: 'rgba(227, 217, 217, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#110101',
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 12,
   },
   jerseyLogo: {
-    position: 'absolute',
-    width: 90,
-    height: 90,
-    top: '25%',
-    right: '6%',
-    alignSelf: 'center',
+    width: 50,
+    height: 50,
   },
   HrsPergoal: {
     width: 20,
@@ -653,18 +695,11 @@ const styles = StyleSheet.create({
     height: 20,
     marginRight: 3,
   },
-  // Stats Container
-  statsContainer: {
-    // marginTop: 1,
-    // paddingHorizontal: 10,
-  },
-
-  // Top Row
+  statsContainer: {},
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    // marginBottom: 5,
     gap: 65,
     paddingHorizontal: 5,
   },
@@ -675,7 +710,6 @@ const styles = StyleSheet.create({
   statLabel: {
     color: '#FFFFFF',
     fontSize: 12,
-    // fontWeight: 'bold',
     textAlign: 'center',
   },
   statSubLabel: {
@@ -686,7 +720,6 @@ const styles = StyleSheet.create({
   statLabel2: {
     color: '#FFFFFF',
     fontSize: 11,
-    // fontWeight: 'bold',
     textAlign: 'center',
   },
   statSubLabel2: {
@@ -720,32 +753,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '900',
   },
-
-  // W/L/D Box
   wldContainer: {
-    // gap: 1,
     marginTop: -5,
   },
   wldBox: {
-    // backgroundColor: '#9B2C8A', // Purple/magenta color from your screenshot
-    // borderRadius: 4,
-    // paddingHorizontal: -6,
-    // paddingVertical: -6,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: 45, // Adjust based on your needs
+    width: 45,
     paddingLeft: 17,
   },
-
   wldBox1: {
-    // backgroundColor: '#9B2C8A', // Purple/magenta color from your screenshot
-    // paddingHorizontal: -6,
-    // paddingVertical: -6,
-    // flexDirection: 'row',
-    // justifyContent: 'space-between',
     alignItems: 'center',
-    width: 30, // Adjust based on your needs
+    width: 30,
     paddingTop: 3,
   },
   wldLabel: {
@@ -762,12 +782,8 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
-
-  // Bottom Row
   bottomRow: {
     flexDirection: 'row',
-    // justifyContent: 'space-between',
-    // marginTop: 1,
   },
   miniStatBox: {
     alignItems: 'center',
@@ -781,15 +797,12 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    // backgroundColor: 'rgba(244, 146, 239, 0.4)',
-    // gap: 6,
     paddingHorizontal: 2,
     paddingVertical: 2,
     borderRadius: 4,
   },
   infoBox: {
     flex: 1,
-    //  backgroundColor: 'rgba(244, 146, 239, 0.4)',
   },
   infoText: {
     fontSize: 10,
@@ -800,7 +813,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 8,
     textAlign: 'center',
-    // marginTop: 2,
     fontStyle: 'italic',
   },
   valueWithUnit: {
@@ -810,7 +822,7 @@ const styles = StyleSheet.create({
   unitText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: 500,
+    fontWeight: '500',
     marginLeft: 4,
     marginTop: 10,
   },
