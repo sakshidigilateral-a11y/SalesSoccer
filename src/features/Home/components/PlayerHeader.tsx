@@ -23,6 +23,8 @@ import {
 } from '../../../redux/playerSlice';
 import {AppDispatch, RootState} from '../../../redux/store';
 import LinearGradient from 'react-native-linear-gradient';
+import { setPlayerStatsFromAPI } from '../../../redux/playerSlice';
+
 
 const API_URL = 'https://salessoccer.digilateral.com';
 const {width: SW, height: SH} = Dimensions.get('window');
@@ -114,11 +116,11 @@ const PlayerHeader = () => {
         }
       });
 
-     socketRef.current.on('possessionUpdate', data => {
-  if (data.possessionCount !== undefined) {
-    dispatch(updatePossessionCount(data.possessionCount));
-  }
-});
+      socketRef.current.on('possessionUpdate', data => {
+        if (data.possessionCount !== undefined) {
+          dispatch(updatePossessionCount(data.possessionCount));
+        }
+      });
 
       socketRef.current.on('matchStatsUpdate', data => {
         console.log('Match stats update received:', data);
@@ -138,7 +140,24 @@ const PlayerHeader = () => {
       //   dispatch(setPlayerStats(data.stats));
       // });
 
-      
+      socketRef.current.on('playerStatsUpdate', data => {
+        console.log('🔥 LIVE STATS UPDATE:', data);
+
+        if (data.stats) {
+          dispatch(setPlayerStats(data.stats));
+        }
+      });
+
+      socketRef.current.on('matchPlayersUpdate', () => {
+        console.log('Players updated, refetch match data');
+        // Call your fetchData() from MatchSummary here via event or redux flag
+      });
+
+      socketRef.current.on('matchCreated', () => {
+        console.log('Match created → refresh player stats');
+        fetchPlayerStats();
+      });
+
       socketRef.current.on('disconnect', () => {
         console.log('Socket disconnected');
       });
@@ -151,6 +170,7 @@ const PlayerHeader = () => {
     }
   };
 
+  
   const fetchPlayerStats = async () => {
     try {
       dispatch(setLoadingAction(true));
@@ -169,7 +189,7 @@ const PlayerHeader = () => {
 
       if (response.data.success) {
         const playerData = response.data.data;
-        dispatch(setPlayerStats(playerData));
+       dispatch(setPlayerStatsFromAPI(playerData));
         console.log(
           '=== API RESPONSE KEYS..................... ===',
           playerData,

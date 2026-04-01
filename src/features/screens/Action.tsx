@@ -237,7 +237,8 @@ export default function Action({navigation}) {
   const handleOpenApprovalModal = (mrId, uploadId, action) => {
     setSelectedMrId(mrId);
     setSelectedUploadId(uploadId);
-    setApprovalAction(action.toLowerCase()); // FORCE lowercase
+    setApprovalAction(action.toLowerCase());
+    setRejectionReason('');
     setModalVisibleApproval(true);
   };
 
@@ -343,6 +344,7 @@ export default function Action({navigation}) {
       );
 
       if (response?.data?.success) {
+        setRejectionReason('');
         setModalVisibleApproval(false);
         setModalVisibleSuccess(true);
         fetchData();
@@ -455,35 +457,35 @@ export default function Action({navigation}) {
                 </View>
               )}
 
-           {['FLM', 'SLM', 'TLM'].includes(userType ?? '') && (
-  <View style={styles.actionButtons}>
-    <TouchableOpacity
-      disabled={item.status?.toLowerCase() !== 'pending'}
-      onPress={() =>
-        handleOpenApprovalModal(item.mrId, item.id, 'approved')
-      }
-      style={[
-        styles.approveButton,
-        item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
-      ]}>
-      <AntdesignIcon name="checkcircleo" size={20} color="green" />
-      <Text style={styles.approveText}>Approve</Text>
-    </TouchableOpacity>
+            {['FLM', 'SLM', 'TLM'].includes(userType ?? '') && (
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  disabled={item.status?.toLowerCase() !== 'pending'}
+                  onPress={() =>
+                    handleOpenApprovalModal(item.mrId, item.id, 'approved')
+                  }
+                  style={[
+                    styles.approveButton,
+                    item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
+                  ]}>
+                  <AntdesignIcon name="checkcircleo" size={20} color="green" />
+                  <Text style={styles.approveText}>Approve</Text>
+                </TouchableOpacity>
 
-    <TouchableOpacity
-      disabled={item.status?.toLowerCase() !== 'pending'}
-      onPress={() =>
-        handleOpenApprovalModal(item.mrId, item.id, 'rejected')
-      }
-      style={[
-        styles.rejectButton,
-        item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
-      ]}>
-      <AntdesignIcon name="closecircleo" size={20} color="red" />
-      <Text style={styles.rejectText}>Reject</Text>
-    </TouchableOpacity>
-  </View>
-)}
+                <TouchableOpacity
+                  disabled={item.status?.toLowerCase() !== 'pending'}
+                  onPress={() =>
+                    handleOpenApprovalModal(item.mrId, item.id, 'rejected')
+                  }
+                  style={[
+                    styles.rejectButton,
+                    item.status?.toLowerCase() !== 'pending' && {opacity: 0.4},
+                  ]}>
+                  <AntdesignIcon name="closecircleo" size={20} color="red" />
+                  <Text style={styles.rejectText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Details */}
             <Text style={styles.detailText}>
@@ -539,7 +541,7 @@ export default function Action({navigation}) {
 
   return (
     <ImageBackground source={Assets.Common.background} style={styles.container}>
-          <AppStatusBar />
+      <AppStatusBar />
       <View style={styles.content}>
         <LinearGradient
           colors={['rgb(225,69,209)', '#7b2ed6']}

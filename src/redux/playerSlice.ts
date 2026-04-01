@@ -36,39 +36,31 @@ const playerSlice = createSlice({
   initialState,
   reducers: {
     setPlayerStats: (state, action: PayloadAction<PlayerStats>) => {
-  const incoming = action.payload;
+      const incoming = action.payload;
 
-  if (!state.stats) {
-    state.stats = incoming;
-    return;
-  }
+      if (!state.stats) {
+        state.stats = incoming;
+        return;
+      }
 
-  const currentCounter = state.stats.currentCounter ?? 0;
-  const incomingCounter = incoming.currentCounter ?? currentCounter;
+      const currentCounter = state.stats.currentCounter ?? 0;
+      const incomingCounter = incoming.currentCounter ?? currentCounter;
 
-  const currentGoals = state.stats.totalGoals ?? 0;
-  const incomingGoals = incoming.totalGoals ?? currentGoals;
+      const currentGoals = state.stats.totalGoals ?? 0;
+      const incomingGoals = incoming.totalGoals ?? currentGoals;
 
-  state.stats = {
-    ...state.stats,
-    ...incoming,
+      state.stats = {
+        ...state.stats,
+        ...incoming,
+        currentCounter:
+          incomingCounter >= currentCounter ? incomingCounter : currentCounter,
+        totalGoals:
+          incomingGoals >= currentGoals ? incomingGoals : currentGoals,
+      };
 
-    // Never let counter go backwards
-    currentCounter:
-      incomingCounter >= currentCounter
-        ? incomingCounter
-        : currentCounter,
-
-    // Never let goals go backwards for MR
-    totalGoals:
-      incomingGoals >= currentGoals
-        ? incomingGoals
-        : currentGoals,
-  };
-
-  state.loading = false;
-  state.error = null;
-},
+      state.loading = false;
+      state.error = null;
+    },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },
@@ -81,6 +73,46 @@ const playerSlice = createSlice({
       state.loading = false;
       state.error = null;
     },
+
+    // New action — called only from fetchPlayerStats() (direct API call, always trusted)
+setPlayerStatsFromAPI: (state, action: PayloadAction<PlayerStats>) => {
+  const incoming = action.payload;
+  state.stats = {
+    ...state.stats,
+    ...incoming,
+    // ✅ Still protect currentCounter from resetting
+    currentCounter: Math.max(
+      state.stats?.currentCounter ?? 0,
+      incoming.currentCounter ?? 0,
+    ),
+  };
+  state.loading = false;
+  state.error = null;
+},
+
+// Existing setPlayerStats — keep the totalGoals guard for socket-only updates
+setPlayerStats: (state, action: PayloadAction<PlayerStats>) => {
+  const incoming = action.payload;
+  if (!state.stats) {
+    state.stats = incoming;
+    return;
+  }
+  const currentGoals = state.stats.totalGoals ?? 0;
+  const incomingGoals = incoming.totalGoals ?? currentGoals;
+
+  state.stats = {
+    ...state.stats,
+    ...incoming,
+    currentCounter: Math.max(
+      state.stats.currentCounter ?? 0,
+      incoming.currentCounter ?? 0,
+    ),
+    // ✅ Socket updates still can't decrease goals (prevents race conditions)
+    totalGoals: incomingGoals >= currentGoals ? incomingGoals : currentGoals,
+  };
+  state.loading = false;
+  state.error = null;
+},
     // ✅ Add incremental update reducers
     updateGoalCount: (state, action: PayloadAction<number>) => {
       if (state.stats) {
@@ -121,6 +153,7 @@ export const {
   setLoading,
   setError,
   clearPlayerStats,
+  setPlayerStatsFromAPI,
   updateGoalCount,
   updatePossessionCount,
   incrementGoal,

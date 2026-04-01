@@ -1276,10 +1276,13 @@ const playerPosition = rawCounter;
   useEffect(() => {
   if (!socket) return;
 
-  const refresh = () => {
-    console.log('SOCKET REFRESH FETCH');
+  
+const refresh = () => {
+  console.log('SOCKET REFRESH FETCH (delayed)');
+  setTimeout(() => {
     fetchData();
-  };
+  }, 600); // wait for backend to update mr-stats
+};
 
   socket.on('goalUpdate', refresh);
   socket.on('possessionUpdate', refresh);
@@ -1301,7 +1304,13 @@ const playerPosition = rawCounter;
 useEffect(() => {
   if (!userId) return;
   fetchData();
-}, [userId]);
+}, [userId, role]);
+
+useEffect(() => {
+  if (showGround) {
+    fetchData();
+  }
+}, [showGround]);
 
 // useEffect(() => {
 //   if (!stats?.currentCounter) return;
