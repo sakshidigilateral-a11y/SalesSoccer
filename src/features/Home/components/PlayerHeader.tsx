@@ -100,25 +100,25 @@ const PlayerHeader = () => {
       socketRef.current.on('uploadStatusChanged', data => {
         console.log('Upload status changed:', data);
         if (data.mrId !== userId) return;
-        if (data.status === 'approved') {
-          console.log('Upload approved, refreshing stats...');
+
+        // Refresh stats for BOTH approved and rejected
+        if (data.status === 'approved' || data.status === 'rejected') {
+          console.log('Upload status changed, refreshing stats...');
           fetchPlayerStats();
         }
       });
 
       socketRef.current.on('goalUpdate', data => {
-        console.log('Goal update received:', data);
-        if (data.mrId === userId && data.goalCount !== undefined) {
+        if (data.goalCount !== undefined) {
           dispatch(updateGoalCount(data.goalCount));
         }
       });
 
-      socketRef.current.on('possessionUpdate', data => {
-        console.log('Possession update received:', data);
-        if (data.mrId === userId && data.possessionCount !== undefined) {
-          dispatch(updatePossessionCount(data.possessionCount));
-        }
-      });
+     socketRef.current.on('possessionUpdate', data => {
+  if (data.possessionCount !== undefined) {
+    dispatch(updatePossessionCount(data.possessionCount));
+  }
+});
 
       socketRef.current.on('matchStatsUpdate', data => {
         console.log('Match stats update received:', data);
@@ -132,12 +132,13 @@ const PlayerHeader = () => {
         fetchPlayerStats();
       });
 
-      socketRef.current.on('playerStatsUpdate', data => {
-        if (data.mrId !== userId) return;
-        console.log('🔥 LIVE STATS UPDATE:', data.stats);
-        dispatch(setPlayerStats(data.stats));
-      });
+      // socketRef.current.on('playerStatsUpdate', data => {
+      //   if (data.mrId !== userId) return;
+      //   console.log('🔥 LIVE STATS UPDATE:', data.stats);
+      //   dispatch(setPlayerStats(data.stats));
+      // });
 
+      
       socketRef.current.on('disconnect', () => {
         console.log('Socket disconnected');
       });

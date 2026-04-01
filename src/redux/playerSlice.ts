@@ -36,31 +36,39 @@ const playerSlice = createSlice({
   initialState,
   reducers: {
     setPlayerStats: (state, action: PayloadAction<PlayerStats>) => {
-      const incoming = action.payload;
+  const incoming = action.payload;
 
-      // ✅ If userIds are different, ALWAYS accept the new data
-      if (!state.stats || state.stats.userId !== incoming.userId) {
-        state.stats = incoming;
-        state.loading = false;
-        state.error = null;
-        return;
-      }
+  if (!state.stats) {
+    state.stats = incoming;
+    return;
+  }
 
-      // Same user — apply your existing staleness check
-      const isNewerGoal = incoming.totalGoals > state.stats.totalGoals;
-      const isSameGoalButHigherCounter =
-        incoming.totalGoals === state.stats.totalGoals &&
-        (incoming.currentCounter ?? 0) >= (state.stats.currentCounter ?? 0);
+  const currentCounter = state.stats.currentCounter ?? 0;
+  const incomingCounter = incoming.currentCounter ?? currentCounter;
 
-      if (isNewerGoal || isSameGoalButHigherCounter) {
-        state.stats = {...state.stats, ...incoming};
-      } else {
-        console.log('Ignored outdated stats from API');
-      }
+  const currentGoals = state.stats.totalGoals ?? 0;
+  const incomingGoals = incoming.totalGoals ?? currentGoals;
 
-      state.loading = false;
-      state.error = null;
-    },
+  state.stats = {
+    ...state.stats,
+    ...incoming,
+
+    // Never let counter go backwards
+    currentCounter:
+      incomingCounter >= currentCounter
+        ? incomingCounter
+        : currentCounter,
+
+    // Never let goals go backwards for MR
+    totalGoals:
+      incomingGoals >= currentGoals
+        ? incomingGoals
+        : currentGoals,
+  };
+
+  state.loading = false;
+  state.error = null;
+},
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
     },

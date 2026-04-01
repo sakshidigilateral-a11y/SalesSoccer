@@ -62,7 +62,7 @@ const LoginScreen = ({navigation}: any) => {
         const decoded: any = jwtDecode(token);
 
         dispatch(clearPlayerStats());
-
+        
         // Save in Redux
         dispatch(
           setCredentials({

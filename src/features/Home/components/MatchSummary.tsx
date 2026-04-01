@@ -1024,10 +1024,19 @@ const MatchSummary = () => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const goalHandledRef = useRef(false);
   const lastTapRef = useRef<number>(0);
-  const rawCounter = Number(stats?.currentCounter ?? 1);
+ //const rawCounter = Math.max(1, Number(stats?.currentCounter || 1));
+const myApiCounter =
+  allMrs.find(m => m.mrId === userId)?.currentCounter;
+
+const rawCounter =
+  myApiCounter && myApiCounter > 0
+    ? myApiCounter
+    : stats?.currentCounter || 1;
+
+const playerPosition = rawCounter;
   console.log('stats.totalGoals', stats?.totalGoals);
   console.log('stats.currentMatchGoals', stats?.currentMatchGoals);
-  const playerPosition = Math.min(Math.max(rawCounter, 1), 7);
+ // const playerPosition = Math.min(Math.max(rawCounter, 1), 7);
 
   const playerPositionText = getPlayerPositionText(playerPosition);
   console.log('BANNER COUNTER FROM REDUX:', rawCounter);
@@ -1064,8 +1073,7 @@ const MatchSummary = () => {
 
   const avgFrames =
     Assets.PlayerPosition[clampedAvg] || Assets.PlayerPosition[1];
-  const bannerCounter =
-    (playerPosition > 0 ? playerPosition : 1) || clampedAvg || 1;
+  const bannerCounter = Math.max(1, rawCounter || 1);
 
   const bannerFrames =
     Assets.PlayerPosition[bannerCounter] || Assets.PlayerPosition[1];
@@ -1113,8 +1121,8 @@ const MatchSummary = () => {
         console.log('MR API MY:', myTeam);
         console.log('MR API OPP:', opponent);
 
-       setAllMrs(prev => myTeam.length ? myTeam : prev);
-setAllOppMrs(prev => opponent.length ? opponent : prev);
+        setAllMrs(myTeam);
+        setAllOppMrs(opponent);
 
         return;
       }
@@ -1266,66 +1274,86 @@ setAllOppMrs(prev => opponent.length ? opponent : prev);
   // }, [userId, role]);
 
   useEffect(() => {
-    if (!socket) return;
+  if (!socket) return;
 
-    const h = () => {
-      console.log('SOCKET REFRESH FETCH');
-      fetchData();
-    };
+  const refresh = () => {
+    console.log('SOCKET REFRESH FETCH');
+    fetchData();
+  };
 
-    socket.on('goal', h);
-    socket.on('matchUpdate', h);
+  socket.on('goalUpdate', refresh);
+  socket.on('possessionUpdate', refresh);
+  socket.on('matchStatsUpdate', refresh);
+  socket.on('playerStatsUpdate', refresh);
+  socket.on('uploadStatusChanged', refresh);
+  socket.on('matchCompleted', refresh);
 
-    return () => {
-      socket.off('goal', h);
-      socket.off('matchUpdate', h);
-    };
-  }, [socket, fetchData]);
+  return () => {
+    socket.off('goalUpdate', refresh);
+    socket.off('possessionUpdate', refresh);
+    socket.off('matchStatsUpdate', refresh);
+    socket.off('playerStatsUpdate', refresh);
+    socket.off('uploadStatusChanged', refresh);
+    socket.off('matchCompleted', refresh);
+  };
+}, [socket, fetchData]);
 
-  useEffect(() => {
-    if (!isMR) return;
+useEffect(() => {
+  if (!userId) return;
+  fetchData();
+}, [userId]);
 
-    const safePos =
-      !playerPosition || isNaN(playerPosition) ? 1 : playerPosition;
+// useEffect(() => {
+//   if (!stats?.currentCounter) return;
 
-    const LINE_WIDTH = SW - 160;
-    const STEP = LINE_WIDTH / 7;
-    const toVal = (safePos - 1) * STEP;
+//   const LINE_WIDTH = SW - 160;
+//   const STEP = LINE_WIDTH / 7;
+//   const toVal = (stats.currentCounter - 1) * STEP;
 
-    if (!isFinite(toVal)) return;
+//   translateX.setValue(toVal);
+// }, [stats?.currentCounter]);
 
-    Animated.timing(translateX, {
-      toValue: toVal,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
+useEffect(() => {
+  if (!stats?.currentCounter) return;
+  console.log('Redux counter loaded:', stats.currentCounter);
+}, [stats]);
 
-    const frames = Assets.PlayerPosition[safePos];
-    if (!Array.isArray(frames) || frames.length === 0) return;
+//   useEffect(() => {
+//   if (!isMR) return;
+//   if (!stats) return;
+//   if (!stats.currentCounter) return;
 
-    let frameTimer: any;
-    let pauseTimer: any;
+//   const safePos = Math.min(Math.max(stats.currentCounter, 1), 7);
 
-    const startAnimation = () => {
-      frameTimer = setInterval(() => {
-        setFrameIndex(prev => (prev + 1) % frames.length);
-      }, 600);
+//   const LINE_WIDTH = SW - 160;
+//   const STEP = LINE_WIDTH / 7;
+//   const toVal = (safePos - 1) * STEP;
 
-      // run animation for 6 seconds
-      pauseTimer = setTimeout(() => {
-        clearInterval(frameTimer);
+//   Animated.timing(translateX, {
+//     toValue: toVal,
+//     duration: 500,
+//     useNativeDriver: true,
+//   }).start();
+// }, [stats?.currentCounter, isMR]);
 
-        // pause for 1 minute
-        setTimeout(startAnimation, 60000);
-      }, 6000);
-    };
+useEffect(() => {
+  if (!isMR) return;
+  if (!rawCounter) return;
 
-    startAnimation();
-    return () => {
-      clearInterval(frameTimer);
-      clearTimeout(pauseTimer);
-    };
-  }, [playerPosition, isMR]);
+  const safePos = Math.min(Math.max(rawCounter, 1), 7);
+
+  const LINE_WIDTH = SW - 160;
+  const STEP = LINE_WIDTH / 7;
+  const toVal = (safePos - 1) * STEP;
+
+  translateX.setValue(toVal);
+
+  Animated.timing(translateX, {
+    toValue: toVal,
+    duration: 500,
+    useNativeDriver: true,
+  }).start();
+}, [rawCounter, isMR]);
 
   useEffect(() => {
     if (isMR) return;
