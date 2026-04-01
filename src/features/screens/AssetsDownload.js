@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import React, {useEffect, useRef, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import FastImage from '@candlefinance/faster-image';
+import FastImage from 'react-native-fast-image';
 import * as RNFS from 'react-native-fs';
 import DeviceInfo from 'react-native-device-info';
-import LinearGradient from 'react-native-linear-gradient';
+import {LinearGradient} from 'react-native-linear-gradient';
 
 const API_URL = 'https://salessoccer.digilateral.com';
 
@@ -148,7 +148,8 @@ export default function AssetsDownloadPage({navigation}) {
         const baseUrl = `${API_URL}/DIGI`;
         const localBasePath = `${RNFS.DocumentDirectoryPath}/DIGI`;
 
-        const assetsDownloaded = await AsyncStorage.getItem('assetsDownloaded');
+       const teamName = await AsyncStorage.getItem('teamName');
+const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName}`);
 
         if (assetsDownloaded === 'true' && (await RNFS.exists(localBasePath))) {
           console.log('✅ Assets already exist');
@@ -192,7 +193,7 @@ export default function AssetsDownloadPage({navigation}) {
         clearInterval(messageIntervalRef.current);
         setStatusMessage("🏆 All set! Let's play!");
 
-        await AsyncStorage.setItem('assetsDownloaded', 'true');
+       await AsyncStorage.setItem(`assetsDownloaded_${teamName}`, 'true');
 
         setTimeout(() => {
           navigation.replace('Maintabs');

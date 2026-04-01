@@ -131,6 +131,34 @@ const buildFlatList = (notifications: Notification[]): ListItem[] => {
   return result;
 };
 
+const highlightMessage = (message: string) => {
+  const keywords = ['attacking', 'midfield', 'defensive', 'goal', 'GOAL', 'attack', 'defens'];
+  const parts = message.split(
+    /\b(attacking|midfield|defensive|goal|GOAL|attack|defens)\b/gi,
+  );
+
+  return parts.map((part, index) => {
+    const isKeyword = keywords.some(
+      kw => kw.toLowerCase() === part.toLowerCase(),
+    );
+    return isKeyword ? (
+      <Text
+        key={index}
+        style={{
+          fontFamily: 'Airstrike Bold',
+          color: '#fff',
+          fontSize: 13,
+        }}>
+        {part}
+      </Text>
+    ) : (
+      <Text key={index} style={styles.cardMessage}>
+        {part}
+      </Text>
+    );
+  });
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const NotificationScreen = ({navigation}: {navigation: any}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -180,7 +208,8 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
 
   const markAllCurrentAsRead = async () => {
     const currentIds = await loadReadIds();
-    let changed = false;69
+    let changed = false;
+    69;
     for (const n of notifications) {
       if (!currentIds.has(n.id)) {
         currentIds.add(n.id);
@@ -337,7 +366,7 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
         onPress={() => handleNotificationTap(n)}
         activeOpacity={0.75}
         style={[styles.card, !read && styles.cardUnread]}>
-                <AppStatusBar />
+        <AppStatusBar />
 
         <LinearGradient
           colors={
@@ -363,7 +392,7 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
           </View>
           <View style={styles.cardBottomRow}>
             <Text style={styles.cardMessage} numberOfLines={2}>
-              {n.message}
+              {highlightMessage(n.message)}
             </Text>
             <Text style={styles.cardTime}>{formatTime(n.createdAt)}</Text>
 
@@ -494,7 +523,7 @@ const NotificationScreen = ({navigation}: {navigation: any}) => {
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#0D0014', paddingBottom: 45},
 
-  headerGradient: { paddingVertical: 11},
+  headerGradient: {paddingVertical: 11},
   headerTitle: {
     textAlign: 'center',
     fontSize: 16,
@@ -525,9 +554,9 @@ const styles = StyleSheet.create({
   },
   pillActive: {
     // backgroundColor: 'rgba(235, 230, 238, 0.55)',
-     borderColor: 'rgba(167,139,250,0.7)',
+    borderColor: 'rgba(167,139,250,0.7)',
   },
-  pillText: {color: 'rgba(255,255,255,0.65)', fontFamily:'Airstrike Bold'},
+  pillText: {color: 'rgba(255,255,255,0.65)', fontFamily: 'Airstrike Bold'},
   pillTextActive: {fontFamily: 'Airstrike Bold'},
   badge: {
     backgroundColor: '#e14593',

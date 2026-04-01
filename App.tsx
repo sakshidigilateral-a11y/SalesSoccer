@@ -13,8 +13,9 @@ import {PersistGate} from 'redux-persist/integration/react';
 import AssetsDownloadPage from './src/features/screens/AssetsDownload';
 import SplashScreen from './src/features/screens/Splash';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
-import {LogBox, } from 'react-native';
-import { Text, TextInput } from 'react-native';
+import {LogBox} from 'react-native';
+import {Text, TextInput} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 
 // Disable warnings
 LogBox.ignoreAllLogs(true);
@@ -39,9 +40,14 @@ const AppNavigator = () => {
   return (
     <SafeAreaProvider>
       <SafeAreaView
-        style={{flex: 1}}
+        style={{flex: 1, backgroundColor: 'transparent'}}
         edges={['top', 'bottom', 'left', 'right']}>
-        <Stack.Navigator screenOptions={{headerShown: false}}>
+        <Stack.Navigator
+          screenOptions={{
+            headerShown: false,
+            contentStyle: {backgroundColor: 'transparent'},
+            animation: 'fade', // optional smooth transition
+          }}>
           {isLoading ? (
             <Stack.Screen name="Splash" component={SplashScreen} />
           ) : isAuthenticated ? (
@@ -49,6 +55,7 @@ const AppNavigator = () => {
           ) : (
             <Stack.Screen name="Login" component={LoginScreens} />
           )}
+
           <Stack.Screen name="AssetsDownload" component={AssetsDownloadPage} />
         </Stack.Navigator>
       </SafeAreaView>
@@ -61,9 +68,13 @@ const App = () => {
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <ThemeProvider theme={theme}>
-          <NavigationContainer>
-            <AppNavigator />
-          </NavigationContainer>
+          <LinearGradient
+            colors={['#b408f3', '#7b2ed6']}
+            style={{flex: 1}}>
+            <NavigationContainer>
+              <AppNavigator />
+            </NavigationContainer>
+          </LinearGradient>
         </ThemeProvider>
       </PersistGate>
     </Provider>

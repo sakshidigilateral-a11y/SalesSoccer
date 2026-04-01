@@ -618,7 +618,7 @@ export default function Action({navigation}) {
           colors={['rgba(214, 171, 215, 0.8)', 'rgba(57, 12, 89, 0.5)']}
           style={styles.header}>
           <Text style={[styles.headerText, {flex: 1.5}]}>Doctor</Text>
-          <Text style={[styles.headerText, {flex: 1}]}>RxBP</Text>
+          <Text style={[styles.headerText, {flex: 1}]}>Dribble</Text>
           <Text style={[styles.headerText, {flex: 1}]}>Time</Text>
           <Text style={[styles.headerText, {flex: 1}]}>STATUS</Text>
           <Text style={[styles.headerText, {flex: 0.5}]}></Text>

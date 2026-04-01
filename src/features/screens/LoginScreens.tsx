@@ -80,6 +80,7 @@ const LoginScreen = ({navigation}: any) => {
         // ✅ NEW: Check if assets are downloaded
         // const assetsDownloaded = await AsyncStorage.getItem('assetsDownloaded');
 
+        
         const folder100x100 = RNFS.DocumentDirectoryPath + '/DIGI/100x100';
         const folder200x200 = RNFS.DocumentDirectoryPath + '/DIGI/200x200';
 

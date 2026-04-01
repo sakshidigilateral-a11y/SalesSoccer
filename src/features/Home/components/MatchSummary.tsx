@@ -245,7 +245,8 @@ const GroundModal = ({
   const activeMrs = showOpp ? oppMrs : mrs;
   console.log('MY TEAM MRS:', mrs);
   console.log('OPP TEAM MRS:', oppMrs);
-
+  console.log('SHOWING TEAM:', showOpp ? 'OPPONENT' : 'MY TEAM');
+  console.log('ACTIVE MRS:', activeMrs);
   const sorted = useMemo(
     () =>
       [...activeMrs].sort(
@@ -254,38 +255,19 @@ const GroundModal = ({
     [activeMrs],
   );
 
-  // const zoneGroups = useMemo(() => {
-  //   const g: Record<string, MRStat[]> = {DEFENSE: [], MIDFIELD: [], ATTACK: []};
-  //   sorted.forEach(mr => g[getZone(mr.currentCounter || 4)].push(mr));
-  //   return g;
-  // }, [sorted]);
+  useEffect(() => {
+    console.log('MODAL RECEIVED MY:', mrs);
+    console.log('MODAL RECEIVED OPP:', oppMrs);
+  }, [mrs, oppMrs]);
 
-  // const playerPositions = useMemo(() => {
-  //   const pos: {mr: MRStat; x: number; y: number}[] = [];
-  //   (['ATTACK', 'MIDFIELD', 'DEFENSE'] as const).forEach(zone => {
-  //     const grp = zoneGroups[zone];
-  //     grp.forEach((mr, i) =>
-  //       pos.push({
-  //         mr,
-  //         x: getXFrac(mr.currentCounter || 4, i, grp.length),
-  //         y: getYFrac(i, grp.length),
-  //       }),
-  //     );
-  //   });
-  //   return pos;
-  // }, [zoneGroups]);
-
-  // counter 1→strip0, 2→strip1 of DEFENSE  (x: 0.05–0.18, left third)
-  // counter 3→strip0, 4→strip1, 5→strip2 of MIDFIELD (x: 0.40–0.58, center)
-  // counter 6→strip0, 7→strip1 of ATTACK   (x: 0.78–0.92, right third)
   const ZONE_ANCHORS = {
     DEFENSE: [
-      {x: 0.82, y: 0.52},
-      {x: 0.9, y: 0.52},
-      {x: 0.82, y: 0.62},
-      {x: 0.9, y: 0.62},
-      {x: 0.82, y: 0.72},
-      {x: 0.9, y: 0.72},
+      {x: 0.92, y: 0.42}, // slot 0 — top
+      {x: 0.92, y: 0.62}, // slot 1 — bottom
+      {x: 0.96, y: 0.42}, // slot 2
+      {x: 0.96, y: 0.62}, // slot 3
+      {x: 0.92, y: 0.52}, // slot 4 — middle
+      {x: 0.96, y: 0.52}, // slot 5
     ],
     MIDFIELD: [
       {x: 0.42, y: 0.52},
@@ -296,12 +278,12 @@ const GroundModal = ({
       {x: 0.58, y: 0.62},
     ],
     ATTACK: [
-      {x: 0.1, y: 0.52},
-      {x: 0.18, y: 0.52},
-      {x: 0.1, y: 0.62},
-      {x: 0.18, y: 0.62},
-      {x: 0.1, y: 0.72},
-      {x: 0.18, y: 0.72},
+      {x: 0.08, y: 0.45}, // ← was 0.22
+      {x: 0.14, y: 0.45}, // ← was 0.28
+      {x: 0.08, y: 0.52}, // ← was 0.22
+      {x: 0.14, y: 0.45}, // ← was 0.28
+      {x: 0.08, y: 0.58}, // ← was 0.22
+      {x: 0.14, y: 0.58}, // ← was 0.28
     ],
   };
 
@@ -316,13 +298,13 @@ const GroundModal = ({
     return 0;
   };
   const POSITION_ANCHORS_MAP: Record<number, {x: number; y: number}> = {
-    1: {x: 0.82, y: 0.42}, // Defense
-    2: {x: 0.88, y: 0.62}, // Defense
+    1: {x: 0.86, y: 0.45}, // ← was 0.82
+    2: {x: 0.92, y: 0.58},
     3: {x: 0.5, y: 0.35}, // Midfield
     4: {x: 0.5, y: 0.65}, // Midfield
-    5: {x: 0.16, y: 0.38}, // Attack
-    6: {x: 0.16, y: 0.62}, // Attack
-    7: {x: 0.04, y: 0.5}, // Goal (near left goalpost)
+    5: {x: 0.22, y: 0.45}, // Attack - centered
+    6: {x: 0.22, y: 0.58}, // Attack - centered
+    7: {x: 0.04, y: 0.5}, // Goal
   };
 
   const getStripIndex = (counter: number) => {
@@ -348,40 +330,6 @@ const GroundModal = ({
     MIDFIELD: 'MIDFIELD',
     DEFENSE: 'ATTACK',
   };
-
-  // const ZONE_TO_ASSET: Record<string, 'ATTACK' | 'MIDFIELD' | 'DEFENSE'> = {
-  //   ATTACK: 'ATTACK',
-  //   MIDFIELD: 'MIDFIELD',
-  //   DEFENSE: 'DEFENSE',
-  // };
-
-  // const playerPositions = useMemo(() => {
-  //   const pos: {mr: MRStat; x: number; y: number}[] = [];
-  //   const zoneCount: Record<string, number> = {
-  //     DEFENSE: 0,
-  //     MIDFIELD: 0,
-  //     ATTACK: 0,
-  //   };
-
-  //   sorted.forEach(mr => {
-  //     const counter =
-  //       mr.mrId === userId
-  //         ? Number(stats?.currentCounter || mr.currentCounter || 1)
-  //         : mr.currentCounter || 1;
-
-  //     const zone = getZone(counter);
-  //     const anchors = ZONE_ANCHORS[zone];
-  //     const slotIdx = zoneCount[zone] % anchors.length;
-  //     zoneCount[zone]++;
-  //     pos.push({
-  //       mr,
-  //       x: anchors[slotIdx].x,
-  //       y: anchors[slotIdx].y,
-  //     });
-  //   });
-
-  //   return pos;
-  // }, [sorted]);
 
   const buildPositions = (teamMrs: MRStat[], isOppTeam: boolean) => {
     return teamMrs.map(mr => {
@@ -409,14 +357,19 @@ const GroundModal = ({
   };
 
   const myTeamPositions = useMemo(() => {
+    const zoneCount: Record<string, number> = {
+      DEFENSE: 0,
+      MIDFIELD: 0,
+      ATTACK: 0,
+    };
+
     return mrs.map(mr => {
-      // Logged-in player uses banner counter
-      const counter =
-        mr.mrId === userId ? bannerCounter : mr.currentCounter || 1;
+      const counter = Math.max(mr.currentCounter || 1, 1);
 
       const zone = getZone(counter);
       const anchors = ZONE_ANCHORS[zone];
-      const slotIdx = counterToStripIndex(counter) % anchors.length;
+      const slotIdx = zoneCount[zone] % anchors.length;
+      zoneCount[zone]++; // ← increment so next player in same zone gets different slot
 
       return {
         mr,
@@ -428,11 +381,18 @@ const GroundModal = ({
   }, [mrs, userId, bannerCounter]);
 
   const oppTeamPositions = useMemo(() => {
+    const zoneCount: Record<string, number> = {
+      DEFENSE: 0,
+      MIDFIELD: 0,
+      ATTACK: 0,
+    };
+
     return oppMrs.map(mr => {
-      const counter = mr.currentCounter || 1;
+      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 7);
       const zone = getZone(counter);
       const anchors = ZONE_ANCHORS[zone];
-      const slotIdx = counterToStripIndex(counter) % anchors.length;
+      const slotIdx = zoneCount[zone] % anchors.length;
+      zoneCount[zone]++;
 
       return {
         mr,
@@ -443,15 +403,15 @@ const GroundModal = ({
     });
   }, [oppMrs]);
 
- const allFieldPositions = useMemo(() => {
-  if (showOpp) {
-    // Show ONLY opponent team players on field
-    return oppTeamPositions;
-  } else {
-    // Show ONLY my team players on field  
-    return myTeamPositions;
-  }
-}, [showOpp, myTeamPositions, oppTeamPositions]);
+  const allFieldPositions = useMemo(() => {
+    if (showOpp) {
+      // Show ONLY opponent team players on field
+      return oppTeamPositions;
+    } else {
+      // Show ONLY my team players on field
+      return myTeamPositions;
+    }
+  }, [showOpp, myTeamPositions, oppTeamPositions]);
 
   const horizontalLock = useRef(
     PanResponder.create({
@@ -487,7 +447,11 @@ const GroundModal = ({
   };
 
   const detailImg = selectedMr
-    ? getPlayerAnimation(selectedMr.currentCounter, 0, showOpp)
+    ? (() => {
+        const c = selectedMr.currentCounter;
+        const animC = showOpp ? (c <= 2 ? 5 : c <= 4 ? c : 1) : c;
+        return getPlayerAnimation(animC, 0, showOpp);
+      })()
     : null;
   const gkL = toPixel(0.11, 0.51);
   const gkR = toPixel(0.99, 0.57);
@@ -653,17 +617,14 @@ const GroundModal = ({
                         }}>
                         <Text
                           style={{color: 'rgba(255,255,255,0.3)', fontSize: 9}}>
-                          Loading...
+                          {showOpp ? 'No opponent data' : 'Loading...'}
                         </Text>
                       </View>
                     ) : (
                       sorted.map(mr => {
                         const sel = selectedMr?.mrId === mr.mrId;
 
-                        const counter =
-                          mr.mrId === userId
-                            ? bannerCounter
-                            : mr.currentCounter || 1;
+                        const counter = Math.max(mr.currentCounter || 1, 1);
 
                         const positionText = getPositionLabel(counter);
 
@@ -909,10 +870,15 @@ const GroundModal = ({
               {/* Players */}
               {allFieldPositions.map(({mr, x, y, isOpp}, i) => {
                 const sel = selectedMr?.mrId === mr.mrId;
-                const counter =
-                  mr.mrId === userId ? bannerCounter : mr.currentCounter || 1;
-
-                const frame = getPlayerAnimation(counter, i, isOpp);
+                const counter = Math.max(mr.currentCounter || 1, 1);
+                const animCounter = isOpp
+                  ? counter <= 2
+                    ? 5 // opponent DEFENSE → use ATTACK frames (they appear on attack side)
+                    : counter <= 4
+                    ? counter // MIDFIELD stays same
+                    : 1 // opponent ATTACK → use DEFENSE frames (they appear on defense side)
+                  : counter;
+                const frame = getPlayerAnimation(animCounter, i, isOpp);
                 if (!frame) return null;
                 const {px, py} = toPixel(x, y);
                 const zone = getZone(counter);
@@ -1032,6 +998,17 @@ const MatchSummary = () => {
   const socket = useSelector((state: RootState) => state.socket?.instance);
   const isMR = (role ?? '').toUpperCase() === 'MR';
   const stats = useSelector((state: RootState) => state.player?.stats);
+  console.log('=== MATCH ORDER DEBUG ===');
+  console.log('totalMatches:', stats?.totalMatches);
+  console.log('last5MatchGoals raw:', JSON.stringify(stats?.last5MatchGoals));
+  console.log(
+    'wins:',
+    stats?.wins,
+    'losses:',
+    stats?.losses,
+    'draws:',
+    stats?.draws,
+  );
   //console.log('PLAYER STATS:', stats);
   const isMatchActive = isMR ? stats?.isMatchOn === 1 : true;
   const [flmLast5, setFlmLast5] = useState<number[]>([]);
@@ -1087,7 +1064,8 @@ const MatchSummary = () => {
 
   const avgFrames =
     Assets.PlayerPosition[clampedAvg] || Assets.PlayerPosition[1];
-  const bannerCounter = playerPosition || clampedAvg || 1;
+  const bannerCounter =
+    (playerPosition > 0 ? playerPosition : 1) || clampedAvg || 1;
 
   const bannerFrames =
     Assets.PlayerPosition[bannerCounter] || Assets.PlayerPosition[1];
@@ -1106,24 +1084,21 @@ const MatchSummary = () => {
     console.log('call ho raha hai');
 
     const userRole = (role ?? '').toLowerCase();
-    const apiRole = userRole === 'mr' ? 'flm' : userRole;
+    // const apiRole = userRole === 'mr' ? 'flm' : userRole;
 
     try {
       if (userRole === 'mr') {
-        let matchId = stats?.fastestGoalMatchId;
+        console.log('=== MR FETCH START ===');
 
-        if (!matchId) {
-          const matchRes = await fetch(
-            `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=mr`,
-          );
-          const matchJson = await matchRes.json();
-          matchId = matchJson?.data?.matches?.[0]?.matchId;
-        }
+        const matchRes = await fetch(
+          `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=mr`,
+        );
+        const matchJson = await matchRes.json();
 
-        if (!matchId) {
-          console.log('No matchId found');
-          return;
-        }
+        const matchId =
+          matchJson?.data?.matches?.[0]?.matchId || stats?.fastestGoalMatchId;
+
+        if (!matchId) return;
 
         const mrRes = await fetch(
           `${BASE_URL}/matches/${matchId}/mr-stats?userId=${userId}&userRole=mr`,
@@ -1132,40 +1107,14 @@ const MatchSummary = () => {
 
         if (!mrJson.success || !mrJson.data) return;
 
-        const myTeamData = (mrJson.data.myTeamMrs || []).map((mr: MRStat) => ({
-          ...mr,
-          currentCounter: Math.max(1, Number(mr.currentCounter) || 1),
-          totalGoals: Number(mr.totalGoals) || 0,
-          totalPoints: Number(mr.totalPoints) || 0,
-        }));
+        const myTeam = mrJson.data.myTeamMrs || [];
+        const opponent = mrJson.data.opponentMrs || [];
 
-        const opponentTeamData = (mrJson.data.opponentMrs || []).map(
-          (mr: MRStat) => ({
-            ...mr,
-            currentCounter: Math.max(1, Number(mr.currentCounter) || 1),
-            totalGoals: Number(mr.totalGoals) || 0,
-            totalPoints: Number(mr.totalPoints) || 0,
-          }),
-        );
+        console.log('MR API MY:', myTeam);
+        console.log('MR API OPP:', opponent);
 
-        // ✅ CHECK which array the logged-in MR actually belongs to
-        const iAmInMyTeam = myTeamData.some((mr: MRStat) => mr.mrId === userId);
-        const iAmInOppTeam = opponentTeamData.some(
-          (mr: MRStat) => mr.mrId === userId,
-        );
-
-        console.log('MR userId:', userId);
-        console.log('iAmInMyTeam:', iAmInMyTeam);
-        console.log('iAmInOppTeam:', iAmInOppTeam);
-
-        if (iAmInOppTeam && !iAmInMyTeam) {
-          console.log('SWAPPING teams for MR');
-          setAllMrs(opponentTeamData);          
-  setAllOppMrs(myTeamData);           
-} else {
-  setAllMrs(myTeamData);
-  setAllOppMrs(opponentTeamData);
-}
+       setAllMrs(prev => myTeam.length ? myTeam : prev);
+setAllOppMrs(prev => opponent.length ? opponent : prev);
 
         return;
       }
@@ -1194,12 +1143,16 @@ const MatchSummary = () => {
       const last5Goals = matches
         .slice(0, 5)
         .map(m => Number(m.totalGoalsByMyMRs) || 0);
-      while (last5Goals.length < 5) last5Goals.push(0);
+      while (last5Goals.length < 5) last5Goals.push(null as any);
       setFlmLast5(last5Goals);
 
       // ✅ Declare ONCE outside the loop
       const myTeamFinal: MRStat[] = [];
       const oppTeamFinal: MRStat[] = [];
+
+      // ✅ Use Maps to accumulate MRs and prevent duplicates across multiple matches
+      const myTeamMap = new Map<string, MRStat>();
+      const oppTeamMap = new Map<string, MRStat>();
 
       for (const m of matches) {
         const mrRes = await fetch(
@@ -1224,47 +1177,43 @@ const MatchSummary = () => {
           }),
         );
 
-        if (myTeamFinal.length === 0 && oppTeamFinal.length === 0) {
-          // Check by flmId since logged-in user is an FLM
-          const userInMyTeam = myTeamData.some(
-            (mr: MRStat) => mr.flmId === userId,
-          );
-          const userInOppTeam = opponentTeamData.some(
-            (mr: MRStat) => mr.flmId === userId,
-          );
+        // Check by flmId since logged-in user is an FLM
+        const userInMyTeam = myTeamData.some(
+          (mr: MRStat) => mr.flmId === userId,
+        );
+        const userInOppTeam = opponentTeamData.some(
+          (mr: MRStat) => mr.flmId === userId,
+        );
 
-          console.log('userId:', userId);
-          console.log(
-            'myTeamData flmIds:',
-            myTeamData.map((m: MRStat) => m.flmId),
-          );
-          console.log(
-            'oppTeamData flmIds:',
-            opponentTeamData.map((m: MRStat) => m.flmId),
-          );
-          console.log(
-            'userInMyTeam:',
-            userInMyTeam,
-            '| userInOppTeam:',
-            userInOppTeam,
-          );
+        let actualMyTeam = myTeamData;
+        let actualOppTeam = opponentTeamData;
 
-          if (userInOppTeam && !userInMyTeam) {
-            // Swap — API returned teams from opponent FLM's perspective
-            myTeamFinal.push(...opponentTeamData);
-            oppTeamFinal.push(...myTeamData);
-          } else {
-            myTeamFinal.push(...myTeamData);
-            oppTeamFinal.push(...opponentTeamData);
-          }
+        // Swap — API returned teams from opponent FLM's perspective
+        if (userInOppTeam && !userInMyTeam) {
+          actualMyTeam = opponentTeamData;
+          actualOppTeam = myTeamData;
         }
+
+        // Add to Maps (If an mrId already exists, it simply overwrites/updates it)
+        actualMyTeam.forEach((mr: MRStat) => myTeamMap.set(mr.mrId, mr));
+        actualOppTeam.forEach((mr: MRStat) => oppTeamMap.set(mr.mrId, mr));
       }
 
-      setAllMrs(myTeamFinal);
-      setAllOppMrs(oppTeamFinal);
+      // Convert Maps back to Arrays and set state
+      // const myTeamFinal = Array.from(myTeamMap.values());
+      // const oppTeamFinal = Array.from(oppTeamMap.values());
 
-      console.log('MY TEAM:', myTeamFinal);
-      console.log('OPP TEAM:', oppTeamFinal);
+      const myTeamFinalArr = Array.from(myTeamMap.values());
+      const oppTeamFinalArr = Array.from(oppTeamMap.values());
+
+      setAllMrs(myTeamFinalArr);
+      setAllOppMrs(oppTeamFinalArr);
+
+      console.log('MY TEAM FINAL:', myTeamFinalArr);
+      console.log('OPP TEAM FINAL:', oppTeamFinalArr);
+
+      console.log('MY TEAM FINAL:', myTeamFinal);
+      console.log('OPP TEAM FINAL:', oppTeamFinal);
     } catch (err) {
       console.log('Fetch Error:', err);
     }
@@ -1317,13 +1266,12 @@ const MatchSummary = () => {
   // }, [userId, role]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
     if (!socket) return;
 
-    const h = () => fetchData();
+    const h = () => {
+      console.log('SOCKET REFRESH FETCH');
+      fetchData();
+    };
 
     socket.on('goal', h);
     socket.on('matchUpdate', h);
@@ -1445,84 +1393,104 @@ const MatchSummary = () => {
         right={10}>
         <Text
           variant="header"
-          fontSize={16}
+          fontSize={18}
           fontFamily={'Airstrike Bold'}
           color="white">
           LAST 5 MATCHES
         </Text>
         <Box flexDirection="row" alignItems="center">
-          {(isMR ? stats?.last5MatchGoals : flmLast5)?.map((score, index) => {
-            const numScore = Number(score);
+          {(() => {
+            const goals = isMR ? stats?.last5MatchGoals : flmLast5;
+            const totalMatches = isMR
+              ? stats?.totalMatches ?? 0
+              : flmLast5.filter((g: any) => g !== null).length;
+            const playedCount = Math.min(totalMatches, 5);
 
-            // ── decide outcome ──
-            // adjust this logic to match your actual data structure
-            const isWin = numScore >= 2;
-            const isLoss = numScore === 0;
-            const isDraw = !isWin && !isLoss;
+            // NO reverse — index 0 is already newest from API
+            const displayGoals: (number | null)[] = Array(5)
+              .fill(null)
+              .map((_, i) => {
+                if (!goals || i >= playedCount) return null; // unplayed = black circle
+                return goals[i] ?? null;
+              });
+            return displayGoals.map((score, index) => {
+              const isEmpty = score === null;
+              const numScore = Number(score);
+              const isWin = !isEmpty && numScore >= 2;
+              const isLoss = !isEmpty && numScore === 0;
+              const isDraw = !isEmpty && !isWin && !isLoss;
+              const outcomeImg = isWin
+                ? Assets.Home.win
+                : isLoss
+                ? Assets.Home.loss
+                : Assets.Home.Draw;
 
-            // const borderColor = isWin ? '#00e676' : isLoss ? '#ff1744' : '#ffeb3b';
-            const outcomeImg = isWin
-              ? Assets.Home.win
-              : isLoss
-              ? Assets.Home.loss
-              : Assets.Home.Draw;
-
-            return (
-              <Box key={index} flexDirection="row" alignItems="center">
-                <Box
-                  width={38}
-                  height={38}
-                  borderRadius={19}
-                  //  backgroundColor="transparentPurple"
-                  justifyContent="center"
-                  alignItems="center"
-                  //  borderWidth={1.5}
-                  style={[styles.circleBorder]}>
-                  {/* ── outcome image ── */}
-                  <Image
-                    source={outcomeImg}
-                    style={{
-                      width: 28,
-                      height: 30,
-                      position: 'absolute',
-                      //  opacity: 0.25,   // subtle background icon
-                    }}
-                    resizeMode="contain"
-                  />
-
-                  {/* ── score number on top ── */}
-                  <Text color="white" fontWeight="bold" fontSize={13}>
-                    {score}
-                  </Text>
-                </Box>
-
-                {index <
-                  ((isMR ? stats?.last5MatchGoals : flmLast5)?.length ?? 0) -
-                    1 && (
+              return (
+                <Box key={index} flexDirection="row" alignItems="center">
                   <Box
-                    width={14}
-                    height={2}
-                    style={{
-                      marginHorizontal: -5,
-                      borderWidth: 1,
-                      backgroundColor: 'rgba(7, 7, 7, 0.4)', // ← just add this line
-                    }}
-                  />
-                )}
-              </Box>
-            );
-          })}
+                    width={38}
+                    height={38}
+                    borderRadius={19}
+                    justifyContent="center"
+                    alignItems="center"
+                    style={[
+                      styles.circleBorder,
+                      isEmpty && {
+                        backgroundColor: '#000',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.2)',
+                        width: 30,
+                        height: 30,
+                        borderRadius: 19,
+                      },
+                    ]}>
+                    {!isEmpty && (
+                      <Image
+                        source={outcomeImg}
+                        style={{
+                          width: 28,
+                          height: 30,
+                          position: 'absolute',
+                        }}
+                        resizeMode="contain"
+                      />
+                    )}
+                    {!isEmpty && (
+                      <Text color="white" fontWeight="bold" fontSize={13}>
+                        {score}
+                      </Text>
+                    )}
+                  </Box>
+
+                  {index < displayGoals.length - 1 && (
+                    <Box
+                      width={14}
+                      height={2}
+                      style={{
+                        marginHorizontal: -5,
+                        borderWidth: 1,
+                        backgroundColor: 'rgba(7, 7, 7, 0.4)',
+                      }}
+                    />
+                  )}
+                </Box>
+              );
+            });
+          })()}
         </Box>
       </Box>
       <TouchableOpacity
         activeOpacity={isMatchActive ? 0.85 : 1}
         disabled={!isMatchActive}
-        onPress={() => {
+        onPress={async () => {
           if (!isMatchActive) return;
           const now = Date.now();
+
           if (now - lastTapRef.current < 300) {
+            await fetchData();
             setShowGround(true);
           }
+
           lastTapRef.current = now;
         }}>
         <Box
@@ -1546,7 +1514,7 @@ const MatchSummary = () => {
             style={{
               position: 'absolute',
               bottom: 2,
-              left: 40,
+              left: 30,
               right: 50,
               height: 2,
               backgroundColor: 'rgba(255,255,255,0.7)',
@@ -1555,21 +1523,20 @@ const MatchSummary = () => {
           />
 
           <Box flex={1} justifyContent="flex-end" alignItems="flex-start">
-            {isMR && positionSrc != null && rawCounter > 0 && (
+            {isMR && positionSrc != null && (
               <Animated.View
                 style={{
                   transform: [{translateX}],
                   flexDirection: 'row',
                   alignItems: 'flex-end',
                 }}>
-                {/* ATTACK: text renders first = behind player */}
-                {playerPositionText === 'Attack' && (
+                {/* ATTACK: text renders BEFORE player (behind) */}
+                {playerPositionText === 'Attack' && rawCounter > 0 && (
                   <Text
                     style={{
                       color: '#fff',
                       fontSize: 16,
                       fontFamily: 'Airstrike Bold',
-                      //   fontStyle: 'italic',
                       letterSpacing: 1,
                       marginBottom: 10,
                       marginRight: 2,
@@ -1588,14 +1555,13 @@ const MatchSummary = () => {
                   style={{width: 44, height: 55, top: 20, right: 10}}
                 />
 
-                {/* DEFENSE / MIDFIELD: text renders after = in front of player */}
-                {playerPositionText !== 'Attack' && (
+                {/* DEFENSE / MIDFIELD: text renders AFTER player (in front) */}
+                {playerPositionText !== 'Attack' && rawCounter > 0 && (
                   <Text
                     style={{
                       color: '#fff',
                       fontSize: 15,
                       fontFamily: 'Airstrike Bold',
-                      //  fontStyle: 'italic',
                       letterSpacing: 1,
                       marginBottom: 10,
                       marginLeft: 4,
@@ -1675,6 +1641,7 @@ const MatchSummary = () => {
         </Box>
       </TouchableOpacity>
       <GroundModal
+        key={allMrs.length + '-' + allOppMrs.length}
         visible={showGround}
         onClose={() => setShowGround(false)}
         mrs={allMrs}

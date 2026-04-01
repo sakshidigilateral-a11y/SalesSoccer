@@ -697,18 +697,24 @@ const MatchSlider = () => {
   const [voteMessage, setVoteMessage] = useState('');
   const lastTapMap = useRef<{[key: string]: number}>({}).current;
 
-  useEffect(() => {
-    fetchAllMatches();
-    setTimeout(() => {
-      flatListRef.current?.scrollToIndex({index: 1, animated: false});
-    }, 300);
-    startRotation();
-    initializeSocket();
-    return () => {
-      if (socketRef.current) socketRef.current.disconnect();
-    };
-  }, []);
+ useEffect(() => {
+  fetchAllMatches();
+  startRotation();
+  initializeSocket();
 
+  return () => {
+    if (socketRef.current) socketRef.current.disconnect();
+  };
+}, []);
+useEffect(() => {
+  fetchAllMatches();
+  startRotation();
+  initializeSocket();
+
+  return () => {
+    if (socketRef.current) socketRef.current.disconnect();
+  };
+}, []);
   const initializeSocket = () => {
     socketRef.current = io(API_URL, {
       transports: ['websocket'],
