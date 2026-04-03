@@ -81,16 +81,11 @@ const getPlayerAnimation = (
   isOpponent: boolean,
 ) => {
   if (counter === 0) return null;
+
   const zone = getZone(Math.min(Math.max(counter, 1), 6));
 
-  // ✅ Flip zone asset for opponent — their ATTACK is our DEFENSE visually
-  const assetZone = isOpponent
-    ? zone === 'ATTACK'
-      ? 'DEFENSE'
-      : zone === 'DEFENSE'
-      ? 'ATTACK'
-      : 'MIDFIELD'
-    : zone;
+  // ❗ DO NOT flip zone — field mirroring already handles direction
+  const assetZone = zone;
 
   const frames = isOpponent
     ? Assets.PlayerMoves.OppTeam[assetZone]
@@ -99,7 +94,6 @@ const getPlayerAnimation = (
   if (!frames || frames.length === 0) return null;
   return frames[index % frames.length];
 };
-
 // Y controls zone on rotated field: ATTACK=top, DEFENSE=bottom
 const ZONE_Y_RANGES: Record<
   'ATTACK' | 'MIDFIELD' | 'DEFENSE',
@@ -1024,19 +1018,16 @@ const MatchSummary = () => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const goalHandledRef = useRef(false);
   const lastTapRef = useRef<number>(0);
- //const rawCounter = Math.max(1, Number(stats?.currentCounter || 1));
-const myApiCounter =
-  allMrs.find(m => m.mrId === userId)?.currentCounter;
+  //const rawCounter = Math.max(1, Number(stats?.currentCounter || 1));
+  const myApiCounter = allMrs.find(m => m.mrId === userId)?.currentCounter;
 
-const rawCounter =
-  myApiCounter && myApiCounter > 0
-    ? myApiCounter
-    : stats?.currentCounter || 1;
+  const rawCounter =
+    myApiCounter !== undefined ? myApiCounter : stats?.currentCounter ?? 0;
 
-const playerPosition = rawCounter;
+  const playerPosition = rawCounter;
   console.log('stats.totalGoals', stats?.totalGoals);
   console.log('stats.currentMatchGoals', stats?.currentMatchGoals);
- // const playerPosition = Math.min(Math.max(rawCounter, 1), 7);
+  // const playerPosition = Math.min(Math.max(rawCounter, 1), 7);
 
   const playerPositionText = getPlayerPositionText(playerPosition);
   console.log('BANNER COUNTER FROM REDUX:', rawCounter);
@@ -1274,95 +1265,94 @@ const playerPosition = rawCounter;
   // }, [userId, role]);
 
   useEffect(() => {
-  if (!socket) return;
+    if (!socket) return;
 
-  
-const refresh = () => {
-  console.log('SOCKET REFRESH FETCH (delayed)');
-  setTimeout(() => {
+    const refresh = () => {
+      console.log('SOCKET REFRESH FETCH (delayed)');
+      setTimeout(() => {
+        fetchData();
+      }, 600); // wait for backend to update mr-stats
+    };
+
+    socket.on('goalUpdate', refresh);
+    socket.on('possessionUpdate', refresh);
+    socket.on('matchStatsUpdate', refresh);
+    socket.on('playerStatsUpdate', refresh);
+    socket.on('uploadStatusChanged', refresh);
+    socket.on('matchCompleted', refresh);
+
+    return () => {
+      socket.off('goalUpdate', refresh);
+      socket.off('possessionUpdate', refresh);
+      socket.off('matchStatsUpdate', refresh);
+      socket.off('playerStatsUpdate', refresh);
+      socket.off('uploadStatusChanged', refresh);
+      socket.off('matchCompleted', refresh);
+    };
+  }, [socket, fetchData]);
+
+  useEffect(() => {
+    if (!userId) return;
     fetchData();
-  }, 600); // wait for backend to update mr-stats
-};
+  }, [userId, role]);
 
-  socket.on('goalUpdate', refresh);
-  socket.on('possessionUpdate', refresh);
-  socket.on('matchStatsUpdate', refresh);
-  socket.on('playerStatsUpdate', refresh);
-  socket.on('uploadStatusChanged', refresh);
-  socket.on('matchCompleted', refresh);
+  useEffect(() => {
+    if (showGround) {
+      fetchData();
+    }
+  }, [showGround]);
 
-  return () => {
-    socket.off('goalUpdate', refresh);
-    socket.off('possessionUpdate', refresh);
-    socket.off('matchStatsUpdate', refresh);
-    socket.off('playerStatsUpdate', refresh);
-    socket.off('uploadStatusChanged', refresh);
-    socket.off('matchCompleted', refresh);
-  };
-}, [socket, fetchData]);
+  // useEffect(() => {
+  //   if (!stats?.currentCounter) return;
 
-useEffect(() => {
-  if (!userId) return;
-  fetchData();
-}, [userId, role]);
+  //   const LINE_WIDTH = SW - 160;
+  //   const STEP = LINE_WIDTH / 7;
+  //   const toVal = (stats.currentCounter - 1) * STEP;
 
-useEffect(() => {
-  if (showGround) {
-    fetchData();
-  }
-}, [showGround]);
+  //   translateX.setValue(toVal);
+  // }, [stats?.currentCounter]);
 
-// useEffect(() => {
-//   if (!stats?.currentCounter) return;
+  useEffect(() => {
+    if (!stats?.currentCounter) return;
+    console.log('Redux counter loaded:', stats.currentCounter);
+  }, [stats]);
 
-//   const LINE_WIDTH = SW - 160;
-//   const STEP = LINE_WIDTH / 7;
-//   const toVal = (stats.currentCounter - 1) * STEP;
+  //   useEffect(() => {
+  //   if (!isMR) return;
+  //   if (!stats) return;
+  //   if (!stats.currentCounter) return;
 
-//   translateX.setValue(toVal);
-// }, [stats?.currentCounter]);
+  //   const safePos = Math.min(Math.max(stats.currentCounter, 1), 7);
 
-useEffect(() => {
-  if (!stats?.currentCounter) return;
-  console.log('Redux counter loaded:', stats.currentCounter);
-}, [stats]);
+  //   const LINE_WIDTH = SW - 160;
+  //   const STEP = LINE_WIDTH / 7;
+  //   const toVal = (safePos - 1) * STEP;
 
-//   useEffect(() => {
-//   if (!isMR) return;
-//   if (!stats) return;
-//   if (!stats.currentCounter) return;
+  //   Animated.timing(translateX, {
+  //     toValue: toVal,
+  //     duration: 500,
+  //     useNativeDriver: true,
+  //   }).start();
+  // }, [stats?.currentCounter, isMR]);
 
-//   const safePos = Math.min(Math.max(stats.currentCounter, 1), 7);
+  useEffect(() => {
+    if (!isMR) return;
+    // if (!rawCounter) return;
 
-//   const LINE_WIDTH = SW - 160;
-//   const STEP = LINE_WIDTH / 7;
-//   const toVal = (safePos - 1) * STEP;
+    const safePos = Math.min(Math.max(rawCounter, 1), 7);
 
-//   Animated.timing(translateX, {
-//     toValue: toVal,
-//     duration: 500,
-//     useNativeDriver: true,
-//   }).start();
-// }, [stats?.currentCounter, isMR]);
+    const LINE_WIDTH = SW - 160;
+    const STEP = LINE_WIDTH / 7;
+    const toVal = (safePos - 1) * STEP;
 
-useEffect(() => {
-  if (!isMR) return;
-  if (!rawCounter) return;
+    translateX.setValue(toVal);
 
-  const safePos = Math.min(Math.max(rawCounter, 1), 7);
-
-  const LINE_WIDTH = SW - 160;
-  const STEP = LINE_WIDTH / 7;
-  const toVal = (safePos - 1) * STEP;
-
-  translateX.setValue(toVal);
-
-  Animated.timing(translateX, {
-    toValue: toVal,
-    duration: 500,
-    useNativeDriver: true,
-  }).start();
-}, [rawCounter, isMR]);
+    Animated.timing(translateX, {
+      toValue: toVal,
+      duration: 500,
+      useNativeDriver: true,
+    }).start();
+  }, [rawCounter, isMR]);
 
   useEffect(() => {
     if (isMR) return;
@@ -1567,8 +1557,8 @@ useEffect(() => {
                   flexDirection: 'row',
                   alignItems: 'flex-end',
                 }}>
-                {/* ATTACK: text renders BEFORE player (behind) */}
-                {playerPositionText === 'Attack' && rawCounter > 0 && (
+                {/* ATTACK text BEFORE player */}
+                {rawCounter > 0 && playerPositionText === 'Attack' && (
                   <Text
                     style={{
                       color: '#fff',
@@ -1585,15 +1575,15 @@ useEffect(() => {
                   </Text>
                 )}
 
-                {/* Player image always in middle */}
+                {/* Player image */}
                 <Image
                   key={frameIndex}
                   source={positionSrc}
                   style={{width: 44, height: 55, top: 20, right: 10}}
                 />
 
-                {/* DEFENSE / MIDFIELD: text renders AFTER player (in front) */}
-                {playerPositionText !== 'Attack' && rawCounter > 0 && (
+                {/* DEFENSE / MIDFIELD text AFTER player */}
+                {rawCounter > 0 && playerPositionText !== 'Attack' && (
                   <Text
                     style={{
                       color: '#fff',
@@ -1611,6 +1601,7 @@ useEffect(() => {
                 )}
               </Animated.View>
             )}
+
             {!isMR && bannerSrc != null && (
               <Animated.View
                 style={{
