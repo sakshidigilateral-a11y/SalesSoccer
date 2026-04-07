@@ -34,7 +34,7 @@ import AppStatusBar from '../Home/components/AppStatusBar';
 const {width} = Dimensions.get('window');
 // AFTER
 
-const API_URL = 'https://salessoccer.digilateral.com';
+const API_URL = 'http://192.168.1.7:5450';
 
 export default function Action({navigation}) {
   const [uploadData, setUploadData] = useState([]);
@@ -60,6 +60,9 @@ export default function Action({navigation}) {
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState<{
+    [key: string]: number;
+  }>({});
   // AFTER existing state declarations
   // const [zoomScale, setZoomScale] = useState(1);
   // const [zoomOffset, setZoomOffset] = useState({x: 0, y: 0});
@@ -444,16 +447,46 @@ export default function Action({navigation}) {
                     Proof
                   </Text>
 
-                  <TouchableOpacity
-                    onPress={() =>
-                      setSelectedImage(`${API_URL}${item.uploadImage[0]}`)
-                    }>
-                    <Image
-                      source={{uri: `${API_URL}${item.uploadImage[0]}`}}
-                      style={styles.prescriptionThumb}
-                      resizeMode="cover"
-                    />
-                  </TouchableOpacity>
+                  <FlatList
+                    data={item.uploadImage}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(img, i) => i.toString()}
+                    onMomentumScrollEnd={e => {
+                      const index = Math.round(
+                        e.nativeEvent.contentOffset.x / (width * 0.7),
+                      );
+                      setActiveImageIndex(prev => ({
+                        ...prev,
+                        [item.id]: index,
+                      }));
+                    }}
+                    renderItem={({item: img}) => (
+                      <TouchableOpacity
+                        onPress={() => setSelectedImage(`${API_URL}${img}`)}>
+                        <Image
+                          source={{uri: `${API_URL}${img}`}}
+                          style={styles.prescriptionThumb}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    )}
+                  />
+
+                  {/* DOTS */}
+                  <View style={styles.dotsContainer}>
+                    {item.uploadImage.map((_: string, i: number) => (
+                      <View
+                        key={i}
+                        style={[
+                          styles.dot,
+                          activeImageIndex[item.id as string] === i &&
+                            styles.activeDot,
+                        ]}
+                      />
+                    ))}
+                  </View>
                 </View>
               )}
 
@@ -888,6 +921,25 @@ const styles = StyleSheet.create({
   },
   titleGradient: {
     width: '100%',
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    marginHorizontal: 3,
+  },
+
+  activeDot: {
+    backgroundColor: '#fff',
+    width: 8,
+    height: 8,
   },
   datePillBtn: {
     flexDirection: 'row',

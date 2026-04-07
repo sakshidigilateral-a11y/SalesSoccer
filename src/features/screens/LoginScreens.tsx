@@ -7,10 +7,10 @@ import {
   Dimensions,
   TouchableOpacity,
   TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import {useRef} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Assets} from '../../assets/images';
 import {Box, Text} from '../../components/themes';
@@ -23,6 +23,7 @@ import axios from 'axios';
 import {jwtDecode} from 'jwt-decode';
 import {clearPlayerStats} from '../../redux/playerSlice';
 import * as RNFS from 'react-native-fs';
+import CustomAlert from './../Home/components/CustomAlert';
 
 const {width} = Dimensions.get('window');
 
@@ -34,21 +35,35 @@ const LoginScreen = ({navigation}: any) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [userPlaceholder, setUserPlaceholder] = useState('Player ID');
   const [passPlaceholder, setPassPlaceholder] = useState('Player PIN');
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const hasNavigated = useRef(false);
+  const [alertType, setAlertType] = useState<
+    'success' | 'error' | 'warning' | 'info'
+  >('info');
 
   const togglePasswordVisibilty = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
 
+  const showAlert = (title: string, message: string, type = 'info') => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type as any);
+    setAlertVisible(true);
+  };
+
   const handleLogin = async () => {
     if (!userId || !password) {
-      Alert.alert('Error', 'Please enter  ID and Password');
+      showAlert('Error', 'Please enter ID and Password', 'error');
       return;
     }
 
     setLoading(true);
     try {
       const response = await axios.post(
-        'https://salessoccer.digilateral.com/api/auth/login',
+        'http://192.168.1.7:5450/api/auth/login',
         {
           userId: userId,
           password: password,
@@ -62,7 +77,7 @@ const LoginScreen = ({navigation}: any) => {
         const decoded: any = jwtDecode(token);
 
         dispatch(clearPlayerStats());
-        
+
         // Save in Redux
         dispatch(
           setCredentials({
@@ -80,20 +95,28 @@ const LoginScreen = ({navigation}: any) => {
         // ✅ NEW: Check if assets are downloaded
         // const assetsDownloaded = await AsyncStorage.getItem('assetsDownloaded');
 
-        
         const folder100x100 = RNFS.DocumentDirectoryPath + '/DIGI/100x100';
         const folder200x200 = RNFS.DocumentDirectoryPath + '/DIGI/200x200';
 
         const folder100x100Exists = await RNFS.exists(folder100x100);
         const folder200x200Exists = await RNFS.exists(folder200x200);
 
-        if (!folder100x100Exists && !folder200x200Exists) {
-          console.log('No asset folders found, navigating to download screen.');
-          navigation.replace('AssetsDownload');
-        } else {
-          console.log('Assets exist, navigating to Home.');
-          navigation.replace('Maintabs');
-        }
+        const teamName = await AsyncStorage.getItem('teamName');
+        const assetsDownloaded = await AsyncStorage.getItem(
+          `assetsDownloaded_${teamName}`,
+        );
+
+        setTimeout(() => {
+          if (
+            assetsDownloaded === 'true' &&
+            folder100x100Exists &&
+            folder200x200Exists
+          ) {
+            navigation.replace('Maintabs');
+          } else {
+            navigation.replace('AssetsDownload');
+          }
+        }, 400); // 300–600ms is ideal
 
         // if (assetsDownloaded === 'true') {
         //   // Assets already downloaded, go to Home
@@ -106,7 +129,7 @@ const LoginScreen = ({navigation}: any) => {
     } catch (error: any) {
       console.log('Full Error Object', error.response);
       const errorMessage = error.response?.data?.message || 'Login Failed';
-      Alert.alert('Login Error', errorMessage);
+      showAlert('Login Error', errorMessage, 'error');
       console.log('Login Error', error);
     } finally {
       setLoading(false);
@@ -137,7 +160,8 @@ const LoginScreen = ({navigation}: any) => {
 
           <Box width="100%">
             {/* User Id */}
-           <Box style={{backgroundColor: 'rgba(0,0,0,0.5)'}}
+            <Box
+              style={{backgroundColor: 'rgba(0,0,0,0.5)'}}
               height={55}
               borderRadius={19}
               marginBottom="m"
@@ -162,7 +186,7 @@ const LoginScreen = ({navigation}: any) => {
                 placeholderTextColor="#fff"
                 value={userId}
                 onChangeText={setUserId}
-                style={[styles.input1,]}
+                style={[styles.input1]}
                 autoCapitalize="none"
                 onFocus={() => setUserPlaceholder('')}
                 onBlur={() => {
@@ -171,7 +195,8 @@ const LoginScreen = ({navigation}: any) => {
               />
             </Box>
             {/* Password */}
-           <Box style={{backgroundColor: 'rgba(0,0,0,0.5)'}}
+            <Box
+              style={{backgroundColor: 'rgba(0,0,0,0.5)'}}
               height={55}
               borderRadius={19}
               flexDirection="row"
@@ -192,7 +217,6 @@ const LoginScreen = ({navigation}: any) => {
               />
               <TextInput
                 placeholder={passPlaceholder}
-                
                 placeholderTextColor="#fff"
                 value={password}
                 onChangeText={setPassword}
@@ -241,6 +265,13 @@ const LoginScreen = ({navigation}: any) => {
           </Box>
         </Box>
       </KeyboardAvoidingView>
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onDismiss={() => setAlertVisible(false)}
+      />
     </ImageBackground>
   );
 };
@@ -252,24 +283,24 @@ const styles = StyleSheet.create({
   logo: {
     width: width * 0.9,
     height: 200,
-   bottom:-40
+    bottom: -40,
   },
-img:{
-height:22,
-width:22,
-marginRight:10
-},
-input1:{
- color: '#fff',
+  img: {
+    height: 22,
+    width: 22,
+    marginRight: 10,
+  },
+  input1: {
+    color: '#fff',
     fontSize: 16,
     height: '100%',
     width: '100%',
     flex: 1,
-  //  marginLeft:-100,
+    //  marginLeft:-100,
     paddingHorizontal: 5,
     fontWeight: '800',
     fontStyle: 'italic',
-},
+  },
   input: {
     color: '#fff',
     fontSize: 16,

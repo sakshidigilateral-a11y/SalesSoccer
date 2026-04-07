@@ -89,7 +89,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
             style={styles.alertBox}>
 
             {/* Icon Circle */}
-            <Animated.View
+            {/* <Animated.View
               style={[
                 styles.iconCircle,
                 {
@@ -99,7 +99,7 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
                 },
               ]}>
               <Text style={[styles.iconText, {color: config.color}]}>{config.icon}</Text>
-            </Animated.View>
+            </Animated.View> */}
 
             {/* Title */}
             <Text style={styles.title}>{title}</Text>

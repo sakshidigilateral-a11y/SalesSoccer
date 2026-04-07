@@ -15,12 +15,11 @@ import {
 import {Assets} from '../../../assets/images';
 import {useSelector} from 'react-redux';
 import {RootState} from '../../../redux/store';
-// import ReactNativeZoomableView from '@openspacelabs/react-native-zoomable-view/src/ReactNativeZoomableView';
 import LinearGradient from 'react-native-linear-gradient';
 import {PanResponder} from 'react-native';
 
 const {width: SW, height: SH} = Dimensions.get('window');
-const BASE_URL = 'https://salessoccer.digilateral.com/api/user';
+const BASE_URL = 'http://192.168.1.7:5450/api/user';
 
 interface MatchStat {
   matchId: string;
@@ -51,16 +50,6 @@ const getZone = (counter: number): 'ATTACK' | 'MIDFIELD' | 'DEFENSE' => {
   return 'ATTACK';
 };
 
-const getStripInZone = (counter: number): number => {
-  if (counter === 1) return 0;
-  if (counter === 2) return 1;
-  if (counter === 3) return 0;
-  if (counter === 4) return 1;
-  if (counter === 5) return 0;
-  if (counter === 6) return 1;
-  return 0;
-};
-
 const getPositionLabel = (counter: number): string => {
   if (counter === 1 || counter === 2) return 'Defense';
   if (counter === 3 || counter === 4) return 'Midfield';
@@ -75,114 +64,44 @@ const getPlayerPositionText = (counter: number) => {
   return 'Attack';
 };
 
-const getPlayerAnimation = (
+// Returns a stable random frame from the zone's full image array
+const getPlayerAnimationByCounter = (
   counter: number,
-  index: number,
+  frameSeed: number,
   isOpponent: boolean,
 ) => {
-  if (counter === 0) return null;
-
-  const zone = getZone(Math.min(Math.max(counter, 1), 6));
-
-  // ❗ DO NOT flip zone — field mirroring already handles direction
-  const assetZone = zone;
+  const zone = counter <= 2 ? 'DEFENSE' : counter <= 4 ? 'MIDFIELD' : 'ATTACK';
 
   const frames = isOpponent
-    ? Assets.PlayerMoves.OppTeam[assetZone]
-    : Assets.PlayerMoves.MyTeam[assetZone];
+    ? Assets.PlayerMoves.OppTeam[zone]
+    : Assets.PlayerMoves.MyTeam[zone];
 
   if (!frames || frames.length === 0) return null;
-  return frames[index % frames.length];
-};
-// Y controls zone on rotated field: ATTACK=top, DEFENSE=bottom
-const ZONE_Y_RANGES: Record<
-  'ATTACK' | 'MIDFIELD' | 'DEFENSE',
-  [number, number]
-> = {
-  ATTACK: [0.05, 0.3],
-  MIDFIELD: [0.38, 0.62],
-  DEFENSE: [0.7, 0.92],
+
+  return frames[frameSeed % frames.length];
 };
 
-const getStripAnchorY = (
-  zone: 'ATTACK' | 'MIDFIELD' | 'DEFENSE',
-  strip: number,
-): number => {
-  const [start, end] = ZONE_Y_RANGES[zone];
-  const stripHeight = (end - start) / 6;
-  return start + stripHeight * strip + stripHeight / 2;
+// Per-counter unique field position anchors (x=0 left/defense, x=1 right/attack)
+const COUNTER_ANCHORS = {
+  1: {x: 0.12, y: 0.35},
+  2: {x: 0.22, y: 0.65},
+
+  3: {x: 0.4, y: 0.3},
+  4: {x: 0.5, y: 0.5},
+
+  5: {x: 0.65, y: 0.7},
+  6: {x: 0.78, y: 0.4},
+
+  7: {x: 0.88, y: 0.55},
 };
 
-const ZONE_X_RANGES: Record<
-  'ATTACK' | 'MIDFIELD' | 'DEFENSE',
-  [number, number]
-> = {
-  DEFENSE: [0.72, 0.96], // right third  (my team defends right)
-  MIDFIELD: [0.36, 0.64], // center
-  ATTACK: [0.04, 0.28], // left third   (my team attacks left)
+const ZONE_X = {
+  DEFENSE: 0.15,
+  MIDFIELD: 0.45,
+  ATTACK: 0.8,
 };
 
-const getStripAnchorX = (
-  zone: 'ATTACK' | 'MIDFIELD' | 'DEFENSE',
-  strip: number,
-): number => {
-  const [start, end] = ZONE_X_RANGES[zone];
-  const stripWidth = (end - start) / 6;
-  return start + stripWidth * strip + stripWidth / 2;
-};
-// const getStripIndex = (counter: number) => {
-//   if (counter <= 6) return counter - 1;
-//   if (counter <= 12) return counter - 7;
-//   return counter - 13;
-// };
-
-// const getXFrac = (
-//   counter: number,
-//   indexInZone: number,
-//   countInZone: number,
-// ): number => {
-//   const zone = getZone(counter);
-//   const strip = getStripIndex(counter);
-
-//   const zoneRanges = {
-//     ATTACK: [0.08, 0.26],
-//     MIDFIELD: [0.38, 0.62],
-//     DEFENSE: [0.74, 0.92],
-//   };
-
-//   const [start, end] = zoneRanges[zone];
-
-//   const stripWidth = (end - start) / 6;
-
-//   const x = start + stripWidth * strip + stripWidth / 2;
-
-//   return Math.min(Math.max(x, 0.05), 0.95);
-// };
-
-// const getYFrac = (index: number, total: number) => {
-//   if (total <= 1) return 0.5;
-//   return 0.25 + (index / Math.max(total - 1, 1)) * 0.5;
-// };
-
-// const getPlayerFrame = (counter: number, frameIdx: number) => {
-//   const zone = getZone(counter);
-//   const arr =
-//     zone === 'ATTACK'
-//       ? Assets.PlayerMoves.Attack
-//       : zone === 'MIDFIELD'
-//       ? Assets.PlayerMoves.Midfield
-//       : Assets.PlayerMoves.Defense;
-//   const frames = Array.isArray(arr) ? arr : [arr];
-//   return frames[frameIdx % frames.length] ?? frames[0];
-// };
-
-//const getPlayerStaticFrame = (counter: number) => getPlayerFrame(counter, 0);
-
-const ZONE_TO_ASSET = {
-  ATTACK: 'ATTACK',
-  MIDFIELD: 'MIDFIELD',
-  DEFENSE: 'DEFENSE',
-};
+const ZONE_Y_SLOTS = [0.25, 0.5, 0.7, 0.85];
 
 const GroundModal = ({
   visible,
@@ -200,11 +119,21 @@ const GroundModal = ({
   bannerCounter: number;
 }) => {
   const [selectedMr, setSelectedMr] = useState<MRStat | null>(null);
-  const [showOpp, setShowOpp] = useState(false); // false=my team, true=opponent
+  const [showOpp, setShowOpp] = useState(false);
   const zoomRef = useRef<any>(null);
   const tableScrollRef = useRef<ScrollView>(null);
   const scale = useRef(new Animated.Value(1)).current;
   const {width: screenW, height: screenH} = useWindowDimensions();
+
+  // Frame seed ref — stable random frame per player, assigned once
+  const mrFrameSeedRef = useRef<Record<string, number>>({});
+  const getFrameSeedForMr = (mrId: string): number => {
+    if (mrFrameSeedRef.current[mrId] === undefined) {
+      mrFrameSeedRef.current[mrId] = Math.floor(Math.random() * 10);
+    }
+    return mrFrameSeedRef.current[mrId];
+  };
+
   const LS_W = screenH;
   const LS_H = screenW;
   const LABEL_H = 34;
@@ -223,24 +152,19 @@ const GroundModal = ({
   const BADGE_SIZE = 13;
   const GK_SIZE = 32;
 
-  // Table
-  const TABLE_W = LS_W * 0.48;
+  const TABLE_W = LS_W * 0.5;
   const COL_NAME = TABLE_W * 0.32;
   const COL_BP = TABLE_W * 0.26;
   const COL_G = TABLE_W * 0.16;
   const COL_POS = TABLE_W * 0.26;
   const HDR_H = 26;
   const ROW_H = 30;
-  const TABLE_AREA_H = STATS_H - HDR_H - 44;
+  const TABLE_AREA_H = STATS_H - HDR_H - 10;
   const TRACK_H = TABLE_AREA_H;
   const THUMB_H = 18;
 
-  // Active list switches with toggle
   const activeMrs = showOpp ? oppMrs : mrs;
-  console.log('MY TEAM MRS:', mrs);
-  console.log('OPP TEAM MRS:', oppMrs);
-  console.log('SHOWING TEAM:', showOpp ? 'OPPONENT' : 'MY TEAM');
-  console.log('ACTIVE MRS:', activeMrs);
+
   const sorted = useMemo(
     () =>
       [...activeMrs].sort(
@@ -254,169 +178,88 @@ const GroundModal = ({
     console.log('MODAL RECEIVED OPP:', oppMrs);
   }, [mrs, oppMrs]);
 
-  const ZONE_ANCHORS = {
-    DEFENSE: [
-      {x: 0.92, y: 0.42}, // slot 0 — top
-      {x: 0.92, y: 0.62}, // slot 1 — bottom
-      {x: 0.96, y: 0.42}, // slot 2
-      {x: 0.96, y: 0.62}, // slot 3
-      {x: 0.92, y: 0.52}, // slot 4 — middle
-      {x: 0.96, y: 0.52}, // slot 5
-    ],
-    MIDFIELD: [
-      {x: 0.42, y: 0.52},
-      {x: 0.5, y: 0.52},
-      {x: 0.58, y: 0.52},
-      {x: 0.42, y: 0.62},
-      {x: 0.5, y: 0.62},
-      {x: 0.58, y: 0.62},
-    ],
-    ATTACK: [
-      {x: 0.08, y: 0.45}, // ← was 0.22
-      {x: 0.14, y: 0.45}, // ← was 0.28
-      {x: 0.08, y: 0.52}, // ← was 0.22
-      {x: 0.14, y: 0.45}, // ← was 0.28
-      {x: 0.08, y: 0.58}, // ← was 0.22
-      {x: 0.14, y: 0.58}, // ← was 0.28
-    ],
-  };
-
-  const counterToStripIndex = (counter: number): number => {
-    if (counter === 1) return 0; // DEFENSE strip 1 → anchor index 0
-    if (counter === 2) return 2; // DEFENSE strip 2 → anchor index 2
-    if (counter === 3) return 0; // MIDFIELD strip 3 → anchor index 0
-    if (counter === 4) return 2; // MIDFIELD strip 4 → anchor index 2
-    if (counter === 5) return 4; // MIDFIELD strip 5 → anchor index 4
-    if (counter === 6) return 0; // ATTACK strip 6 → anchor index 0
-    if (counter === 7) return 2; // ATTACK strip 7 → anchor index 2
-    return 0;
-  };
-  const POSITION_ANCHORS_MAP: Record<number, {x: number; y: number}> = {
-    1: {x: 0.86, y: 0.45}, // ← was 0.82
-    2: {x: 0.92, y: 0.58},
-    3: {x: 0.5, y: 0.35}, // Midfield
-    4: {x: 0.5, y: 0.65}, // Midfield
-    5: {x: 0.22, y: 0.45}, // Attack - centered
-    6: {x: 0.22, y: 0.58}, // Attack - centered
-    7: {x: 0.04, y: 0.5}, // Goal
-  };
-
-  const getStripIndex = (counter: number) => {
-    if (counter <= 6) return counter - 1;
-    if (counter <= 12) return counter - 7;
-    return counter - 13;
-  };
-
-  const MY_TEAM_ZONE_TO_ASSET: Record<
-    'ATTACK' | 'MIDFIELD' | 'DEFENSE',
-    'ATTACK' | 'MIDFIELD' | 'DEFENSE'
-  > = {
-    ATTACK: 'DEFENSE',
-    MIDFIELD: 'MIDFIELD',
-    DEFENSE: 'ATTACK',
-  };
-
-  const OPP_TEAM_ZONE_TO_ASSET: Record<
-    'ATTACK' | 'MIDFIELD' | 'DEFENSE',
-    'ATTACK' | 'MIDFIELD' | 'DEFENSE'
-  > = {
-    ATTACK: 'DEFENSE',
-    MIDFIELD: 'MIDFIELD',
-    DEFENSE: 'ATTACK',
-  };
-
-  const buildPositions = (teamMrs: MRStat[], isOppTeam: boolean) => {
-    return teamMrs.map(mr => {
-      //console.log('MR:', mr.mrName, 'Counter:', counter, 'X:', x, 'Y:', y);
-      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 7);
-
-      // DIRECT anchor mapping by counter
-      const anchor = POSITION_ANCHORS_MAP[counter] || POSITION_ANCHORS_MAP[1];
-
-      let x = anchor.x;
-      let y = anchor.y;
-
-      // Mirror for opponent team
-      if (isOppTeam) {
-        x = 1 - x;
-      }
-
-      return {
-        mr,
-        x,
-        y,
-        isOpp: isOppTeam,
-      };
-    });
-  };
-
+  // ── Positions: each counter maps to its own unique anchor ──
   const myTeamPositions = useMemo(() => {
-    const zoneCount: Record<string, number> = {
-      DEFENSE: 0,
-      MIDFIELD: 0,
-      ATTACK: 0,
+    const zoneGroups: Record<string, MRStat[]> = {
+      DEFENSE: [],
+      MIDFIELD: [],
+      ATTACK: [],
     };
+
+    mrs.forEach(mr => {
+      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 6);
+      const zone =
+        counter <= 2 ? 'DEFENSE' : counter <= 4 ? 'MIDFIELD' : 'ATTACK';
+      zoneGroups[zone].push(mr);
+    });
 
     return mrs.map(mr => {
-      const counter = Math.max(mr.currentCounter || 1, 1);
-
-      const zone = getZone(counter);
-      const anchors = ZONE_ANCHORS[zone];
-      const slotIdx = zoneCount[zone] % anchors.length;
-      zoneCount[zone]++; // ← increment so next player in same zone gets different slot
+      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 6);
+      const zone =
+        counter <= 2 ? 'DEFENSE' : counter <= 4 ? 'MIDFIELD' : 'ATTACK';
+      const seed = getFrameSeedForMr(mr.mrId);
+      const playersInZone = zoneGroups[zone];
+      const idx = playersInZone.findIndex(p => p.mrId === mr.mrId);
+      const total = playersInZone.length;
+      const y = total === 1 ? 0.5 : ZONE_Y_SLOTS[idx % ZONE_Y_SLOTS.length];
 
       return {
         mr,
-        x: anchors[slotIdx].x,
-        y: anchors[slotIdx].y,
+        x: ZONE_X[zone], // MY team: Defense=left, Attack=right
+        y,
         isOpp: false,
+        seed,
       };
     });
-  }, [mrs, userId, bannerCounter]);
+  }, [mrs]);
 
   const oppTeamPositions = useMemo(() => {
-    const zoneCount: Record<string, number> = {
-      DEFENSE: 0,
-      MIDFIELD: 0,
-      ATTACK: 0,
+    const zoneGroups: Record<string, MRStat[]> = {
+      DEFENSE: [],
+      MIDFIELD: [],
+      ATTACK: [],
     };
 
+    oppMrs.forEach(mr => {
+      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 6);
+      const zone =
+        counter <= 2 ? 'DEFENSE' : counter <= 4 ? 'MIDFIELD' : 'ATTACK';
+      zoneGroups[zone].push(mr);
+    });
+
     return oppMrs.map(mr => {
-      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 7);
-      const zone = getZone(counter);
-      const anchors = ZONE_ANCHORS[zone];
-      const slotIdx = zoneCount[zone] % anchors.length;
-      zoneCount[zone]++;
+      const counter = Math.min(Math.max(mr.currentCounter || 1, 1), 6);
+      const zone =
+        counter <= 2 ? 'DEFENSE' : counter <= 4 ? 'MIDFIELD' : 'ATTACK';
+      const seed = getFrameSeedForMr(mr.mrId);
+      const playersInZone = zoneGroups[zone];
+      const idx = playersInZone.findIndex(p => p.mrId === mr.mrId);
+      const total = playersInZone.length;
+      const y = total === 1 ? 0.5 : ZONE_Y_SLOTS[idx % ZONE_Y_SLOTS.length];
 
       return {
         mr,
-        x: 1 - anchors[slotIdx].x,
-        y: anchors[slotIdx].y,
+        x: 1 - ZONE_X[zone], // OPP team: mirrored — their Defense=right, Attack=left
+        y,
         isOpp: true,
+        seed,
       };
     });
   }, [oppMrs]);
 
   const allFieldPositions = useMemo(() => {
-    if (showOpp) {
-      // Show ONLY opponent team players on field
-      return oppTeamPositions;
-    } else {
-      // Show ONLY my team players on field
-      return myTeamPositions;
-    }
+    return showOpp ? oppTeamPositions : myTeamPositions;
   }, [showOpp, myTeamPositions, oppTeamPositions]);
 
   const horizontalLock = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        // allow gesture only if horizontal movement is bigger
-        return Math.abs(gesture.dx) > Math.abs(gesture.dy);
-      },
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        Math.abs(gesture.dx) > Math.abs(gesture.dy),
       onPanResponderMove: () => {},
       onPanResponderRelease: () => {},
     }),
   ).current;
+
   const sliderTop =
     sorted.length > 1 && selectedMr
       ? (sorted.findIndex(m => m.mrId === selectedMr.mrId) /
@@ -425,10 +268,11 @@ const GroundModal = ({
       : 0;
 
   const toPixel = (xFrac: number, yFrac: number) => {
+    const xFlipped = 1 - xFrac; // ADD THIS LINE
     const leftEdge = BL + (TL - BL) * (1 - yFrac);
     const rightEdge = BR + (TR - BR) * (1 - yFrac);
     return {
-      px: leftEdge + (rightEdge - leftEdge) * xFrac,
+      px: leftEdge + (rightEdge - leftEdge) * xFlipped, // use xFlipped
       py: G_TOP + grassH * yFrac,
     };
   };
@@ -440,15 +284,16 @@ const GroundModal = ({
       tableScrollRef.current?.scrollTo({y: idx * ROW_H, animated: true});
   };
 
-  const detailImg = selectedMr
-    ? (() => {
-        const c = selectedMr.currentCounter;
-        const animC = showOpp ? (c <= 2 ? 5 : c <= 4 ? c : 1) : c;
-        return getPlayerAnimation(animC, 0, showOpp);
-      })()
-    : null;
-  const gkL = toPixel(0.11, 0.51);
-  const gkR = toPixel(0.99, 0.57);
+  // ── detailImg: uses getPlayerAnimationByCounter (not old getPlayerAnimation) ──
+  const detailImg = useMemo(() => {
+    if (!selectedMr) return null;
+    const counter = Math.min(Math.max(selectedMr.currentCounter || 1, 1), 7);
+    const seed = getFrameSeedForMr(selectedMr.mrId);
+    return getPlayerAnimationByCounter(counter, seed, showOpp);
+  }, [selectedMr, showOpp]);
+
+  const gkL = toPixel(0.88, 0.51);
+  const gkR = toPixel(0.0, 0.57);
   const gkFrame = Assets.Home.GoalKeeper;
   const gkFrame2 = (() => {
     const p = (s: any) => (Array.isArray(s) ? s[0] : s);
@@ -465,33 +310,23 @@ const GroundModal = ({
   const LBL_H = LABEL_H * 0.85;
 
   const zoomIn = () => {
-    Animated.spring(scale, {
-      toValue: 1.5,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(scale, {toValue: 1.5, useNativeDriver: true}).start();
   };
 
   const zoomOut = () => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
+    Animated.spring(scale, {toValue: 1, useNativeDriver: true}).start();
   };
 
   const zoomToPoint = (x: number, y: number) => {
     if (!zoomRef.current) return;
-
-    const nx = x / LS_W;
-    const ny = y / FIELD_H;
-
     zoomRef.current.zoomToLocation({
-      x: nx,
-      y: ny,
+      x: x / LS_W,
+      y: y / FIELD_H,
       scale: 2.2,
       animated: true,
     });
   };
-  // Toggle pill colours
+
   const myColor: [string, string] = ['#1a6ecc', '#c2149c'];
   const oppColor: [string, string] = ['#ab128f', '#2709be'];
   const activeHdr: [string, string] = ['#c2185b', '#7b0040'];
@@ -529,12 +364,11 @@ const GroundModal = ({
               width: LS_W,
               height: STATS_H,
               flexDirection: 'row',
-              alignItems: 'flex-end',
               paddingTop: 6,
               paddingLeft: 2,
             }}>
             <View style={{flex: 1, paddingLeft: 2}}>
-              {/* Badge row + TEAM TOGGLE */}
+              {/* Badge row */}
               <View
                 style={{
                   flexDirection: 'row',
@@ -559,18 +393,12 @@ const GroundModal = ({
                 <View
                   style={[
                     gm.sliderTrack,
-                    {
-                      height: HDR_H + TRACK_H,
-                      backgroundColor: '#7b0040',
-                    },
+                    {height: HDR_H + TRACK_H, backgroundColor: '#7b0040'},
                   ]}>
                   <View
                     style={[
                       gm.sliderThumb,
-                      {
-                        top: HDR_H + sliderTop,
-                        backgroundColor: '#c2185b',
-                      },
+                      {top: HDR_H + sliderTop, backgroundColor: '#c2185b'},
                     ]}
                   />
                 </View>
@@ -610,18 +438,18 @@ const GroundModal = ({
                           alignItems: 'center',
                         }}>
                         <Text
-                          style={{color: 'rgba(255,255,255,0.3)', fontSize: 9}}>
+                          style={{
+                            color: 'rgba(255,255,255,0.3)',
+                            fontSize: 9,
+                          }}>
                           {showOpp ? 'No opponent data' : 'Loading...'}
                         </Text>
                       </View>
                     ) : (
                       sorted.map(mr => {
                         const sel = selectedMr?.mrId === mr.mrId;
-
                         const counter = Math.max(mr.currentCounter || 1, 1);
-
                         const positionText = getPositionLabel(counter);
-
                         const vals = [
                           mr.mrName,
                           String(mr.totalPoints),
@@ -674,6 +502,8 @@ const GroundModal = ({
                 </View>
               </View>
             </View>
+
+            {/* Team toggle + zoom controls */}
             <View
               pointerEvents="box-none"
               style={{
@@ -684,7 +514,11 @@ const GroundModal = ({
                 alignItems: 'center',
               }}>
               <View
-                style={{marginLeft: 6, alignItems: 'center', marginBottom: 40}}>
+                style={{
+                  marginLeft: 6,
+                  alignItems: 'center',
+                  marginBottom: 40,
+                }}>
                 <Text
                   style={{
                     color: 'rgba(255,255,255,0.45)',
@@ -700,7 +534,6 @@ const GroundModal = ({
                     setShowOpp(p => !p);
                     setSelectedMr(null);
                   }}>
-                  {/* outer pill track */}
                   <View
                     style={{
                       width: 64,
@@ -715,7 +548,7 @@ const GroundModal = ({
                     <Animated.View
                       style={{
                         position: 'absolute',
-                        left: showOpp ? 36 : 2, // slides left↔right
+                        left: showOpp ? 36 : 2,
                         width: 24,
                         height: 20,
                         borderRadius: 10,
@@ -740,7 +573,6 @@ const GroundModal = ({
                         </Text>
                       </LinearGradient>
                     </Animated.View>
-                    {/* track label on opposite side */}
                     <Text
                       style={{
                         position: 'absolute',
@@ -754,6 +586,7 @@ const GroundModal = ({
                   </View>
                 </TouchableOpacity>
               </View>
+
               <TouchableOpacity
                 onPress={zoomIn}
                 style={{
@@ -789,7 +622,8 @@ const GroundModal = ({
                 </Text>
               </TouchableOpacity>
             </View>
-            {/* Player sprite */}
+
+            {/* Player detail sprite */}
             <View
               style={{
                 width: LS_W * 0.18,
@@ -809,6 +643,7 @@ const GroundModal = ({
             </View>
           </View>
 
+          {/* ══ SECTION 2: FIELD ══ */}
           <View
             {...horizontalLock.panHandlers}
             style={{width: LS_W, height: FIELD_H, overflow: 'hidden'}}>
@@ -828,6 +663,7 @@ const GroundModal = ({
                 }}
                 resizeMode="cover"
               />
+
               {/* Goalkeepers */}
               {gkFrame && (
                 <>
@@ -844,7 +680,6 @@ const GroundModal = ({
                       resizeMode="contain"
                     />
                   </View>
-
                   <View
                     style={{
                       position: 'absolute',
@@ -861,28 +696,17 @@ const GroundModal = ({
                 </>
               )}
 
-              {/* Players */}
-              {allFieldPositions.map(({mr, x, y, isOpp}, i) => {
-                const sel = selectedMr?.mrId === mr.mrId;
-                const counter = Math.max(mr.currentCounter || 1, 1);
-                const animCounter = isOpp
-                  ? counter <= 2
-                    ? 5 // opponent DEFENSE → use ATTACK frames (they appear on attack side)
-                    : counter <= 4
-                    ? counter // MIDFIELD stays same
-                    : 1 // opponent ATTACK → use DEFENSE frames (they appear on defense side)
-                  : counter;
-                const frame = getPlayerAnimation(animCounter, i, isOpp);
+              {/* ── Players on field ── */}
+              {allFieldPositions.map(({mr, x, y, isOpp, seed}, i) => {
+                const counter = Math.min(
+                  Math.max(mr.currentCounter || 1, 1),
+                  7,
+                );
+                const frame = getPlayerAnimationByCounter(counter, seed, isOpp);
                 if (!frame) return null;
+
                 const {px, py} = toPixel(x, y);
-                const zone = getZone(counter);
-                const zc = showOpp
-                  ? '#fff'
-                  : zone === 'ATTACK'
-                  ? '#fff'
-                  : zone === 'MIDFIELD'
-                  ? '#fff'
-                  : '#fff';
+                const sel = selectedMr?.mrId === mr.mrId;
 
                 return (
                   <Pressable
@@ -898,52 +722,21 @@ const GroundModal = ({
                       alignItems: 'center',
                       width: IMG_SIZE,
                     }}>
-                    {sel && (
-                      <View
-                        style={
-                          {
-                            // position: 'absolute',
-                            // top: -3,
-                            // left: -2,
-                            // width: IMG_SIZE + 6,
-                            // height: IMG_SIZE + 6,
-                            // borderRadius: (IMG_SIZE + 6) / 2,
-                            // borderWidth: 2,
-                            // borderColor: '#ffd700',
-                            // backgroundColor: 'rgba(255,215,0,0.2)',
-                          }
-                        }
-                      />
-                    )}
                     <Image
                       source={frame}
                       style={{width: IMG_SIZE, height: IMG_SIZE}}
                       resizeMode="contain"
                     />
-                    <View
+                    <Text
                       style={{
+                        color: '#fff',
+                        fontSize: 8,
+                        fontWeight: 'bold',
                         position: 'absolute',
-                        top: -BADGE_SIZE * 0.2,
-                        right: -BADGE_SIZE * 0.4,
-                        width: BADGE_SIZE,
-                        height: BADGE_SIZE,
-                        borderRadius: BADGE_SIZE / 2,
-                        // backgroundColor: zc,
-                        borderWidth: 1,
-                        // borderColor: '#fff',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        elevation: 3,
+                        top: -BADGE_SIZE * 0.6,
                       }}>
-                      <Text
-                        style={{
-                          color: '#fff',
-                          fontSize: 6,
-                          fontWeight: 'bold',
-                        }}>
-                        {mr.totalGoals}
-                      </Text>
-                    </View>
+                      {String(mr.totalGoals)}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -969,14 +762,24 @@ const GroundModal = ({
             />
             <Image
               source={Assets.Home.MidfieldLabel}
-              style={{width: LBL_W, height: LBL_H, marginBottom: '4%'}}
+              style={{
+                width: LBL_W,
+                height: LBL_H,
+                marginBottom: '4%',
+                left: 20,
+              }}
               resizeMode="contain"
             />
             <Image
               source={
                 showOpp ? Assets.Home.AttackLabel : Assets.Home.DefenceLabel
               }
-              style={{width: LBL_W, height: LBL_H, marginBottom: '4%'}}
+              style={{
+                width: LBL_W,
+                height: LBL_H,
+                marginBottom: '4%',
+                left: 30,
+              }}
               resizeMode="contain"
             />
           </View>
@@ -992,139 +795,70 @@ const MatchSummary = () => {
   const socket = useSelector((state: RootState) => state.socket?.instance);
   const isMR = (role ?? '').toUpperCase() === 'MR';
   const stats = useSelector((state: RootState) => state.player?.stats);
-  console.log('=== MATCH ORDER DEBUG ===');
-  console.log('totalMatches:', stats?.totalMatches);
-  console.log('last5MatchGoals raw:', JSON.stringify(stats?.last5MatchGoals));
-  console.log(
-    'wins:',
-    stats?.wins,
-    'losses:',
-    stats?.losses,
-    'draws:',
-    stats?.draws,
-  );
-  //console.log('PLAYER STATS:', stats);
+
   const isMatchActive = isMR ? stats?.isMatchOn === 1 : true;
   const [flmLast5, setFlmLast5] = useState<number[]>([]);
-
   const [totalGoals, setTotalGoals] = useState(0);
   const [allMrs, setAllMrs] = useState<MRStat[]>([]);
   const [allOppMrs, setAllOppMrs] = useState<MRStat[]>([]);
   const [avgPosition, setAvgPosition] = useState(1);
   const [showGround, setShowGround] = useState(false);
-
   const [frameIndex, setFrameIndex] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const goalHandledRef = useRef(false);
   const lastTapRef = useRef<number>(0);
-  //const rawCounter = Math.max(1, Number(stats?.currentCounter || 1));
-  const myApiCounter = allMrs.find(m => m.mrId === userId)?.currentCounter;
 
+  const myApiCounter = allMrs.find(m => m.mrId === userId)?.currentCounter;
   const rawCounter =
     myApiCounter !== undefined ? myApiCounter : stats?.currentCounter ?? 0;
-
   const playerPosition = rawCounter;
-  console.log('stats.totalGoals', stats?.totalGoals);
-  console.log('stats.currentMatchGoals', stats?.currentMatchGoals);
-  // const playerPosition = Math.min(Math.max(rawCounter, 1), 7);
-
   const playerPositionText = getPlayerPositionText(playerPosition);
-  console.log('BANNER COUNTER FROM REDUX:', rawCounter);
-  console.log(
-    'API COUNTER FROM myTeamMrs:',
-    allMrs.map(m => m.currentCounter),
-  );
-  console.log('Banner Counter:', rawCounter);
-  console.log('Banner Position:', playerPosition);
-  console.log('Avg Position:', clampedAvg);
-  console.log(
-    'allMrs goals',
-    allMrs.map(m => ({
-      name: m.mrName,
-      goals: m.totalGoals,
-    })),
-  );
-
-  // const playerPosition =
-  //   rawCounter > 0 ? Math.min(Math.max(rawCounter, 1), 7) : 1;
-  // const playerPositionText = getPlayerPositionText(playerPosition);
 
   const [avgFrameIndex, setAvgFrameIndex] = useState(0);
   const avgTranslateX = useRef(new Animated.Value(0)).current;
   const safeAvg = Number(avgPosition) || 1;
   const clampedAvg = Math.min(Math.max(safeAvg, 1), 7);
-  console.log('Banner Counter:', rawCounter);
-  console.log('Banner Position:', playerPosition);
-  console.log('Avg Position:', clampedAvg);
-  console.log(
-    'MyTeam Counters:',
-    allMrs.map(m => m.currentCounter),
-  );
 
   const avgFrames =
     Assets.PlayerPosition[clampedAvg] || Assets.PlayerPosition[1];
   const bannerCounter = Math.max(1, rawCounter || 1);
-
   const bannerFrames =
     Assets.PlayerPosition[bannerCounter] || Assets.PlayerPosition[1];
-
   const bannerSrc =
     Array.isArray(bannerFrames) && bannerFrames.length > 0
       ? bannerFrames[avgFrameIndex % bannerFrames.length]
       : bannerFrames;
-  console.log('roleeeses', role);
-  console.log('roleeeses', userId);
-  console.log('roleeeses', isMR);
 
   const fetchData = useCallback(async () => {
     if (!userId) return;
-
-    console.log('call ho raha hai');
-
     const userRole = (role ?? '').toLowerCase();
-    // const apiRole = userRole === 'mr' ? 'flm' : userRole;
 
     try {
       if (userRole === 'mr') {
-        console.log('=== MR FETCH START ===');
-
         const matchRes = await fetch(
           `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=mr`,
         );
         const matchJson = await matchRes.json();
-
         const matchId =
           matchJson?.data?.matches?.[0]?.matchId || stats?.fastestGoalMatchId;
-
         if (!matchId) return;
 
         const mrRes = await fetch(
           `${BASE_URL}/matches/${matchId}/mr-stats?userId=${userId}&userRole=mr`,
         );
         const mrJson = await mrRes.json();
-
         if (!mrJson.success || !mrJson.data) return;
 
-        const myTeam = mrJson.data.myTeamMrs || [];
-        const opponent = mrJson.data.opponentMrs || [];
-
-        console.log('MR API MY:', myTeam);
-        console.log('MR API OPP:', opponent);
-
-        setAllMrs(myTeam);
-        setAllOppMrs(opponent);
-
+        setAllMrs(mrJson.data.myTeamMrs || []);
+        setAllOppMrs(mrJson.data.opponentMrs || []);
         return;
       }
-      console.log('yaha tak aaya');
-      // Replace the entire FLM branch (after "console.log('yaha tak aaya')") with this:
 
       const matchRes = await fetch(
         `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=${userRole}`,
       );
       const matchJson = await matchRes.json();
-
       const matches: MatchStat[] = matchJson.data.matches;
 
       setTotalGoals(
@@ -1145,11 +879,6 @@ const MatchSummary = () => {
       while (last5Goals.length < 5) last5Goals.push(null as any);
       setFlmLast5(last5Goals);
 
-      // ✅ Declare ONCE outside the loop
-      const myTeamFinal: MRStat[] = [];
-      const oppTeamFinal: MRStat[] = [];
-
-      // ✅ Use Maps to accumulate MRs and prevent duplicates across multiple matches
       const myTeamMap = new Map<string, MRStat>();
       const oppTeamMap = new Map<string, MRStat>();
 
@@ -1166,7 +895,6 @@ const MatchSummary = () => {
           totalGoals: Number(mr.totalGoals) || 0,
           totalPoints: Number(mr.totalPoints) || 0,
         }));
-
         const opponentTeamData = (mrJson.data.opponentMrs || []).map(
           (mr: MRStat) => ({
             ...mr,
@@ -1176,7 +904,6 @@ const MatchSummary = () => {
           }),
         );
 
-        // Check by flmId since logged-in user is an FLM
         const userInMyTeam = myTeamData.some(
           (mr: MRStat) => mr.flmId === userId,
         );
@@ -1187,100 +914,31 @@ const MatchSummary = () => {
         let actualMyTeam = myTeamData;
         let actualOppTeam = opponentTeamData;
 
-        // Swap — API returned teams from opponent FLM's perspective
         if (userInOppTeam && !userInMyTeam) {
           actualMyTeam = opponentTeamData;
           actualOppTeam = myTeamData;
         }
 
-        // Add to Maps (If an mrId already exists, it simply overwrites/updates it)
         actualMyTeam.forEach((mr: MRStat) => myTeamMap.set(mr.mrId, mr));
         actualOppTeam.forEach((mr: MRStat) => oppTeamMap.set(mr.mrId, mr));
       }
 
-      // Convert Maps back to Arrays and set state
-      // const myTeamFinal = Array.from(myTeamMap.values());
-      // const oppTeamFinal = Array.from(oppTeamMap.values());
-
-      const myTeamFinalArr = Array.from(myTeamMap.values());
-      const oppTeamFinalArr = Array.from(oppTeamMap.values());
-
-      setAllMrs(myTeamFinalArr);
-      setAllOppMrs(oppTeamFinalArr);
-
-      console.log('MY TEAM FINAL:', myTeamFinalArr);
-      console.log('OPP TEAM FINAL:', oppTeamFinalArr);
-
-      console.log('MY TEAM FINAL:', myTeamFinal);
-      console.log('OPP TEAM FINAL:', oppTeamFinal);
+      setAllMrs(Array.from(myTeamMap.values()));
+      setAllOppMrs(Array.from(oppTeamMap.values()));
     } catch (err) {
       console.log('Fetch Error:', err);
     }
   }, [userId, role, isMR]);
 
-  //  const fetchData = useCallback(async () => {
-  //   if (!userId) return;
-
-  //   const userRole = (role ?? '').toLowerCase();
-
-  //   try {
-
-  //     const matchRes = await fetch(
-  //       `${BASE_URL}/active-matches-stats?userId=${userId}&userRole=${userRole}`
-  //     );
-
-  //     const matchJson = await matchRes.json();
-
-  //     if (!matchJson.success || !matchJson.data?.matches?.length) return;
-
-  //     const matchId = matchJson.data.matches[0].matchId;
-
-  //   const mrRes = await fetch(
-  //   `${BASE_URL}/matches/${m.matchId}/mr-stats?userId=${userId}&userRole=${userRole}`
-  // );
-  //     const mrJson = await mrRes.json();
-
-  //     if (!mrJson.success || !mrJson.data) return;
-
-  //     const myTeam = (mrJson.data.myTeamMrs || []).map((mr: MRStat) => ({
-  //       ...mr,
-  //       currentCounter: Math.max(1, Number(mr.currentCounter) || 1),
-  //       totalGoals: Number(mr.totalGoals) || 0,
-  //       totalPoints: Number(mr.totalPoints) || 0,
-  //     }));
-
-  //     const opponentTeam = (mrJson.data.opponentMrs || []).map((mr: MRStat) => ({
-  //       ...mr,
-  //       currentCounter: Math.max(1, Number(mr.currentCounter) || 1),
-  //       totalGoals: Number(mr.totalGoals) || 0,
-  //       totalPoints: Number(mr.totalPoints) || 0,
-  //     }));
-
-  //     setAllMrs(myTeam);
-  //     setAllOppMrs(opponentTeam);
-
-  //   } catch (err) {
-  //     console.log('Fetch Error:', err);
-  //   }
-  // }, [userId, role]);
-
   useEffect(() => {
     if (!socket) return;
-
-    const refresh = () => {
-      console.log('SOCKET REFRESH FETCH (delayed)');
-      setTimeout(() => {
-        fetchData();
-      }, 600); // wait for backend to update mr-stats
-    };
-
+    const refresh = () => setTimeout(() => fetchData(), 600);
     socket.on('goalUpdate', refresh);
     socket.on('possessionUpdate', refresh);
     socket.on('matchStatsUpdate', refresh);
     socket.on('playerStatsUpdate', refresh);
     socket.on('uploadStatusChanged', refresh);
     socket.on('matchCompleted', refresh);
-
     return () => {
       socket.off('goalUpdate', refresh);
       socket.off('possessionUpdate', refresh);
@@ -1297,56 +955,16 @@ const MatchSummary = () => {
   }, [userId, role]);
 
   useEffect(() => {
-    if (showGround) {
-      fetchData();
-    }
+    if (showGround) fetchData();
   }, [showGround]);
-
-  // useEffect(() => {
-  //   if (!stats?.currentCounter) return;
-
-  //   const LINE_WIDTH = SW - 160;
-  //   const STEP = LINE_WIDTH / 7;
-  //   const toVal = (stats.currentCounter - 1) * STEP;
-
-  //   translateX.setValue(toVal);
-  // }, [stats?.currentCounter]);
-
-  useEffect(() => {
-    if (!stats?.currentCounter) return;
-    console.log('Redux counter loaded:', stats.currentCounter);
-  }, [stats]);
-
-  //   useEffect(() => {
-  //   if (!isMR) return;
-  //   if (!stats) return;
-  //   if (!stats.currentCounter) return;
-
-  //   const safePos = Math.min(Math.max(stats.currentCounter, 1), 7);
-
-  //   const LINE_WIDTH = SW - 160;
-  //   const STEP = LINE_WIDTH / 7;
-  //   const toVal = (safePos - 1) * STEP;
-
-  //   Animated.timing(translateX, {
-  //     toValue: toVal,
-  //     duration: 500,
-  //     useNativeDriver: true,
-  //   }).start();
-  // }, [stats?.currentCounter, isMR]);
 
   useEffect(() => {
     if (!isMR) return;
-    // if (!rawCounter) return;
-
     const safePos = Math.min(Math.max(rawCounter, 1), 7);
-
     const LINE_WIDTH = SW - 160;
     const STEP = LINE_WIDTH / 7;
     const toVal = (safePos - 1) * STEP;
-
     translateX.setValue(toVal);
-
     Animated.timing(translateX, {
       toValue: toVal,
       duration: 500,
@@ -1409,7 +1027,6 @@ const MatchSummary = () => {
     Array.isArray(mrFrames) && mrFrames.length > 0
       ? mrFrames[frameIndex % mrFrames.length]
       : null;
-  const lastMatches = ['2', '0', '0', '1', '2'];
 
   return (
     <Box paddingHorizontal="m" style={{marginTop: '1%'}}>
@@ -1432,12 +1049,10 @@ const MatchSummary = () => {
               ? stats?.totalMatches ?? 0
               : flmLast5.filter((g: any) => g !== null).length;
             const playedCount = Math.min(totalMatches, 5);
-
-            // NO reverse — index 0 is already newest from API
             const displayGoals: (number | null)[] = Array(5)
               .fill(null)
               .map((_, i) => {
-                if (!goals || i >= playedCount) return null; // unplayed = black circle
+                if (!goals || i >= playedCount) return null;
                 return goals[i] ?? null;
               });
             return displayGoals.map((score, index) => {
@@ -1445,7 +1060,6 @@ const MatchSummary = () => {
               const numScore = Number(score);
               const isWin = !isEmpty && numScore >= 2;
               const isLoss = !isEmpty && numScore === 0;
-              const isDraw = !isEmpty && !isWin && !isLoss;
               const outcomeImg = isWin
                 ? Assets.Home.win
                 : isLoss
@@ -1474,21 +1088,16 @@ const MatchSummary = () => {
                     {!isEmpty && (
                       <Image
                         source={outcomeImg}
-                        style={{
-                          width: 28,
-                          height: 30,
-                          position: 'absolute',
-                        }}
+                        style={{width: 28, height: 30, position: 'absolute'}}
                         resizeMode="contain"
                       />
                     )}
                     {!isEmpty && (
                       <Text color="white" fontWeight="bold" fontSize={13}>
-                        {score}
+                        {String(score)}
                       </Text>
                     )}
                   </Box>
-
                   {index < displayGoals.length - 1 && (
                     <Box
                       width={14}
@@ -1506,18 +1115,17 @@ const MatchSummary = () => {
           })()}
         </Box>
       </Box>
+
       <TouchableOpacity
         activeOpacity={isMatchActive ? 0.85 : 1}
         disabled={!isMatchActive}
         onPress={async () => {
           if (!isMatchActive) return;
           const now = Date.now();
-
           if (now - lastTapRef.current < 300) {
             await fetchData();
             setShowGround(true);
           }
-
           lastTapRef.current = now;
         }}>
         <Box
@@ -1529,14 +1137,12 @@ const MatchSummary = () => {
           justifyContent="space-between"
           height={90}
           overflow="hidden">
-          {/* Player Position label top-left */}
           <Box position="absolute" top={6} left={11} zIndex={1}>
             <Text color="white" fontSize={8} letterSpacing={1}>
               Player Position
             </Text>
           </Box>
 
-          {/* Bottom line */}
           <View
             style={{
               position: 'absolute',
@@ -1557,7 +1163,6 @@ const MatchSummary = () => {
                   flexDirection: 'row',
                   alignItems: 'flex-end',
                 }}>
-                {/* ATTACK text BEFORE player */}
                 {rawCounter > 0 && playerPositionText === 'Attack' && (
                   <Text
                     style={{
@@ -1574,15 +1179,11 @@ const MatchSummary = () => {
                     {playerPositionText.toUpperCase()}
                   </Text>
                 )}
-
-                {/* Player image */}
                 <Image
                   key={frameIndex}
                   source={positionSrc}
                   style={{width: 44, height: 55, top: 20, right: 10}}
                 />
-
-                {/* DEFENSE / MIDFIELD text AFTER player */}
                 {rawCounter > 0 && playerPositionText !== 'Attack' && (
                   <Text
                     style={{
@@ -1622,13 +1223,11 @@ const MatchSummary = () => {
                     {getPlayerPositionText(clampedAvg).toUpperCase()}
                   </Text>
                 )}
-
                 <Image
                   key={avgFrameIndex}
                   source={bannerSrc}
                   style={{width: 44, height: 55, top: 15, right: 10}}
                 />
-
                 {getPlayerPositionText(clampedAvg) !== 'Attack' && (
                   <Text
                     style={{
@@ -1646,6 +1245,7 @@ const MatchSummary = () => {
               </Animated.View>
             )}
           </Box>
+
           <Image
             source={Assets.Home.icons10}
             style={{width: 60, height: 60, marginBottom: -30, left: 40}}
@@ -1659,15 +1259,13 @@ const MatchSummary = () => {
               letterSpacing={0.4}>
               Goals
             </Text>
-            {/* <Text color="white" fontSize={18}>
-              {isMR ? stats?.totalGoals || 0 : totalGoals}
-            </Text> */}
           </Box>
           <Text color="white" fontSize={18}>
-            {isMR ? stats?.totalGoals || 0 : totalGoals}
+            {isMR ? String(stats?.totalGoals || 0) : String(totalGoals)}
           </Text>
         </Box>
       </TouchableOpacity>
+
       <GroundModal
         key={allMrs.length + '-' + allOppMrs.length}
         visible={showGround}
@@ -1683,6 +1281,9 @@ const MatchSummary = () => {
 
 const styles = StyleSheet.create({
   bannerBackground: {backgroundColor: 'rgba(0,0,0,0.5)', marginTop: '2%'},
+  circleBorder: {
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
 });
 
 const gm = StyleSheet.create({
@@ -1699,12 +1300,8 @@ const gm = StyleSheet.create({
     alignItems: 'center',
   },
   closeTxt: {color: '#fff', fontSize: 12, fontWeight: 'bold'},
-
   bannerBackground: {backgroundColor: 'rgba(0,0,0,0.5)', marginTop: '2%'},
-  circleBorder: {
-    borderColor: 'rgba(255,255,255,0.3)', // default, overridden inline
-  },
-
+  circleBorder: {borderColor: 'rgba(255,255,255,0.3)'},
   badge: {
     paddingHorizontal: 14,
     paddingVertical: 4,
@@ -1719,7 +1316,6 @@ const gm = StyleSheet.create({
     fontStyle: 'italic',
   },
   chev: {color: '#7b0040', fontSize: 15, fontWeight: '900', lineHeight: 17},
-
   sliderTrack: {
     width: 3,
     backgroundColor: '#7b0040',
@@ -1740,7 +1336,6 @@ const gm = StyleSheet.create({
     shadowRadius: 4,
     elevation: 6,
   },
-
   hdrTxt: {
     color: '#fff',
     fontSize: 7,
@@ -1749,7 +1344,6 @@ const gm = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
-
   labelTxt: {
     color: '#fff',
     fontSize: 11,

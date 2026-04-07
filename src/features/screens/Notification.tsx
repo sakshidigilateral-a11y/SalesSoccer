@@ -21,7 +21,7 @@ import CustomCalendar from '../Home/components/CustomCalender';
 import {position} from '@shopify/restyle';
 import AppStatusBar from '../Home/components/AppStatusBar';
 
-const API_URL = 'https://salessoccer.digilateral.com';
+const API_URL = 'http://192.168.1.7:5450';
 const READ_IDS_KEY = 'notification_read_ids';
 
 interface Notification {

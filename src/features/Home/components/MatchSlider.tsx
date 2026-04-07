@@ -30,7 +30,7 @@ const SIDE_PEEK = 20;
 const CARD_SPACING = 8;
 const cardWidth = width - SIDE_PEEK * 3;
 const CARD_HEIGHT = Math.min(Math.max(height * 0.38, 260), 350);
-const API_URL = 'https://salessoccer.digilateral.com';
+const API_URL = 'http://192.168.1.7:5450';
 
 interface MRUpload {
   mrId: string;
@@ -43,7 +43,7 @@ interface MRUpload {
 }
 
 interface Team {
-  flmId: string;
+  slmId: string;
   flmName: string;
   teamName: string;
   goals: number;
@@ -120,19 +120,23 @@ const MarqueeText = ({text, style}: {text: string; style?: any}) => {
   const pos = useRef(new Animated.Value(0)).current;
   const [w, setW] = useState(120);
 
-  useEffect(() => {
-    if (!shouldScroll) return;
-    pos.setValue(0);
-    Animated.loop(
-      Animated.timing(pos, {
-        toValue: -w,
-        duration: 3000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    ).start();
-    return () => pos.stopAnimation();
-  }, [shouldScroll, w]);
+ useEffect(() => {
+  if (!shouldScroll) return;
+
+  pos.setValue(0);
+
+  Animated.loop(
+    Animated.timing(pos, {
+      toValue: -w,
+      duration: 3000,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }),
+    { iterations: 2 }   // 👈 Only slide 2 times
+  ).start();
+
+  return () => pos.stopAnimation();
+}, [shouldScroll, w]);
 
   if (!shouldScroll) {
     return (
@@ -242,7 +246,7 @@ const MatchDetailModal = ({
         source={Assets.Common.background}
         resizeMode="cover"
         style={D.fullScreen}>
-        {/* Decorative blobs in background */}
+      
 
         {/* Card container */}
         <View style={D.card}>
@@ -350,7 +354,7 @@ const MatchDetailModal = ({
             </RNText>
             <RNText style={D.colTxt}>{'⏱'}</RNText>
             <RNText style={D.colTxt}>{'Goals'}</RNText>
-            <RNText style={D.colTxt}>{'Drimbble'}</RNText>
+            <RNText style={D.colTxt}>{'Dribble'}</RNText>
           </View>
 
           {/* ── Player list ── */}
@@ -522,7 +526,7 @@ const D = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingTop: 20,
     paddingBottom: 8,
   },
 
@@ -791,14 +795,20 @@ useEffect(() => {
     ).start();
   };
 
-  const formatTeamName = (name: string): string => {
-    if (!name) return '';
-    return name
-      .replace(/([A-Z])/g, ' $1')
-      .toLowerCase()
-      .replace(/\b\w/g, c => c.toUpperCase())
-      .trim();
-  };
+  // const formatTeamName = (name: string): string => {
+  //   if (!name) return '';
+  //   return name
+  //     .replace(/([A-Z])/g, ' $1')
+  //     .toLowerCase()
+  //     .replace(/\b\w/g, c => c.toUpperCase())
+  //     .trim();
+  // };
+
+const formatTeamName = (name: string): string => {
+  if (!name) return name;
+  // Just return as-is, only trim whitespace
+  return name.trim();
+};
 
   const handleVote = async (matchId: string, teamId: string) => {
     if (voting || alreadyVoted[matchId] || !token) {
@@ -903,8 +913,10 @@ useEffect(() => {
     const logos: {[k: string]: string} = {};
     for (const match of matches) {
       for (const team of match.teams) {
+        console.log('teamName from API:', JSON.stringify(team.teamName));
         if (team.teamName && !logos[team.teamName]) {
           const p = `${RNFS.DocumentDirectoryPath}/DIGI/100x100/${team.teamName}.png`;
+          // console.log('Logo path:', p, '| exists:', exists);
           if (await RNFS.exists(p)) logos[team.teamName] = `file://${p}`;
         }
       }
@@ -1024,7 +1036,7 @@ useEffect(() => {
                   {item.matches.length === 0 ? (
                     <View style={styles.emptyContainer}>
                       <Text style={styles.emptyText}>
-                        No {item.title.toLowerCase()} matches
+                        No Data Available
                       </Text>
                     </View>
                   ) : (
@@ -1254,7 +1266,7 @@ useEffect(() => {
                 <View style={styles.checkboxRow}>
                   {[0, 1].map(idx => {
                     const isSelected =
-                      selectedTeamId === selectedMatch.teams[idx].flmId;
+                      selectedTeamId === selectedMatch.teams[idx].slmId;
                     const isDisabled =
                       voting || alreadyVoted[selectedMatch?.id || ''];
                     return (
@@ -1267,7 +1279,7 @@ useEffect(() => {
                           isDisabled && {opacity: 0.5},
                         ]}
                         onPress={() =>
-                          setSelectedTeamId(selectedMatch.teams[idx].flmId)
+                          setSelectedTeamId(selectedMatch.teams[idx].slmId)
                         }
                         activeOpacity={0.8}>
                         {/* Logo with tick overlay */}
@@ -1406,7 +1418,7 @@ const styles = StyleSheet.create({
   //   borderBottomWidth: 0.5,
   //   borderColor: 'rgba(255,255,255,0.2)',
   // },
-  teamSide: {flex: 1, alignItems: 'center', justifyContent: 'center'},
+  teamSide: {flex: 1, alignItems: 'center', justifyContent: 'center',marginTop:8},
  center: {flex: 2, alignItems: 'center', justifyContent: 'center', overflow: 'visible'},
 scoreContainer: {
   alignItems: 'center',
@@ -1499,7 +1511,7 @@ matchRow: {
     fontStyle: 'italic',
     marginTop: 10,
   },
-  date: {color: '#fff', fontSize: 8, textAlign: 'center', marginBottom: 8},
+  date: {color: '#fff', fontSize: 8, textAlign: 'center', marginBottom: 10},
   matchNo: {
     color: '#fff',
     fontSize: 8,

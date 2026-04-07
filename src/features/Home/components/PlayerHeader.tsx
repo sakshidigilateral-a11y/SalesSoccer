@@ -23,10 +23,10 @@ import {
 } from '../../../redux/playerSlice';
 import {AppDispatch, RootState} from '../../../redux/store';
 import LinearGradient from 'react-native-linear-gradient';
-import { setPlayerStatsFromAPI } from '../../../redux/playerSlice';
+import {setPlayerStatsFromAPI} from '../../../redux/playerSlice';
+import {Animated, Easing} from 'react-native';
 
-
-const API_URL = 'https://salessoccer.digilateral.com';
+const API_URL = 'http://192.168.1.7:5450';
 const {width: SW, height: SH} = Dimensions.get('window');
 
 interface PlayerStats {
@@ -43,6 +43,51 @@ interface PlayerStats {
   averageTimePerGoal: number | null;
   matchesWithHighestPrescriptions: number;
 }
+
+const MarqueeTeamName = ({text}: {text: string}) => {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const flatText = text.replace(/\n/g, ' ');
+
+  useEffect(() => {
+    translateX.setValue(0);
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.delay(400),
+        Animated.timing(translateX, {
+          toValue: -SW, // ✅ slide full screen width
+          duration: 4000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+        Animated.delay(300),
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [text]);
+
+  return (
+    <View style={{overflow: 'hidden', flex: 1}}>
+      <Animated.Text
+        numberOfLines={1}
+        style={{
+          transform: [{translateX}],
+          fontSize: 12,
+          fontWeight: '900',
+          fontStyle: 'italic',
+          color: 'white',
+          width: SW, // ✅ full screen width so text never wraps
+        }}>
+        {flatText}
+      </Animated.Text>
+    </View>
+  );
+};
 
 const PlayerHeader = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -170,7 +215,6 @@ const PlayerHeader = () => {
     }
   };
 
-  
   const fetchPlayerStats = async () => {
     try {
       dispatch(setLoadingAction(true));
@@ -189,7 +233,7 @@ const PlayerHeader = () => {
 
       if (response.data.success) {
         const playerData = response.data.data;
-       dispatch(setPlayerStatsFromAPI(playerData));
+        dispatch(setPlayerStatsFromAPI(playerData));
         console.log(
           '=== API RESPONSE KEYS..................... ===',
           playerData,
@@ -448,19 +492,51 @@ const PlayerHeader = () => {
           )}
 
           {/* TEAM NAME */}
-          <Text
-            variant="header"
-            fontSize={12}
-            fontStyle="italic"
-            fontWeight="900"
-            position="absolute"
-            top={SH * 0.1}
-            left={65}
-            width="100%"
-            textAlign="center"
-            numberOfLines={2}>
-            {formattedTeamName}
-          </Text>
+          {/* TEAM NAME */}
+          <View
+            style={{
+              position: 'absolute',
+              top: SH * 0.1, // below HQ text, above logo center
+              // left: SW * 0.2,
+              left: '52%', // starts after jersey left edge
+              right: SW * 0.26, // stops before logo circle (logo is right: 8%)
+              height: 16,
+              overflow: 'hidden',
+              zIndex: 0, // ✅ behind logo (logo has elevation: 12)
+            }}>
+            <MarqueeTeamName text={formattedTeamName} />
+          </View>
+          <View
+            style={{
+              position: 'absolute',
+              top: '35%',
+              right: '8%',
+              width: 60,
+              height: 60,
+              borderRadius: 40,
+             // backgroundColor: 'rgba(253, 246, 246, 0.0)', // same as jerseyLogoCircle bg
+              zIndex: 5,
+            }}
+          />
+
+          {/* TEAM LOGO — stays on top */}
+          {teamLogoUri ? (
+            <View style={[styles.jerseyLogoCircle, {zIndex: 10}]}>
+              <Image
+                source={{uri: teamLogoUri}}
+                resizeMode="contain"
+                style={styles.jerseyLogo}
+              />
+            </View>
+          ) : (
+            <View style={[styles.jerseyLogoCircle, {zIndex: 10}]}>
+              <Image
+                source={Assets.Home.Tshirt_logo}
+                resizeMode="stretch"
+                style={styles.jerseyLogo}
+              />
+            </View>
+          )}
         </Box>
       </Box>
 
@@ -599,13 +675,20 @@ const PlayerHeader = () => {
         <View style={styles.bottomRow}>
           {/* Ball Possession */}
           <View style={styles.miniStatBox}>
-            <Text style={styles.miniStatValue}>
-              {typeof stats.totalApprovedUploads === 'number'
-                ? Math.min(Math.floor(stats.totalApprovedUploads), 999)
-                : typeof stats.ballPossession === 'number'
-                ? Math.min(Math.floor(stats.ballPossession), 999)
-                : '-'}
-            </Text>
+            <View style={styles.valueWithUnit}>
+              <Image
+                source={Assets.Home.PlayerLogin}
+                resizeMode="contain"
+                style={{width: 20, height: 20, marginRight: 5}}
+              />
+              <Text style={styles.miniStatValue}>
+                {typeof stats.totalApprovedUploads === 'number'
+                  ? Math.min(Math.floor(stats.totalApprovedUploads), 999)
+                  : typeof stats.ballPossession === 'number'
+                  ? Math.min(Math.floor(stats.ballPossession), 999)
+                  : '-'}
+              </Text>
+            </View>
             <Text style={styles.miniStatLabel}>Dribble</Text>
           </View>
 
@@ -693,14 +776,15 @@ const styles = StyleSheet.create({
     top: '35%',
     right: '8%',
     borderRadius: 40,
-    backgroundColor: 'rgba(227, 217, 217, 0.4)',
+    backgroundColor: 'rgba(227, 217, 217, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#110101',
     shadowOffset: {width: 0, height: 0},
     shadowOpacity: 0.6,
     shadowRadius: 12,
-    elevation: 12,
+    elevation: 0,
+    zIndex: 10,
   },
   jerseyLogo: {
     width: 50,

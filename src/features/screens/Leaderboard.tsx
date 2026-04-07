@@ -23,7 +23,7 @@ import AppStatusBar from '../Home/components/AppStatusBar';
 
 const {width, height} = Dimensions.get('window');
 
-const API_URL = 'https://salessoccer.digilateral.com';
+const API_URL = 'http://192.168.1.7:5450';
 
 type TabType = 'Player Rank' | 'Team Rank' | 'Compare Players';
 

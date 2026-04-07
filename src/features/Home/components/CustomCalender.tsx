@@ -71,7 +71,7 @@ const DrumPicker = ({data, selectedIndex, onIndexChange}: DrumPickerProps) => {
               }}>
               <Text
                 style={{
-                  color: isSelected ? '#fff' : '#000',
+                  color: isSelected ? '#fff' : '#ffffff99',
                   fontSize: 16,
                   fontWeight: 'bold',
                 }}>
@@ -351,7 +351,7 @@ const CustomCalendar = ({
       <View style={styles.nav}>
         <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
           <View style={styles.iconWrapper}>
-            <AntdesignIcon name="left" size={16} color="#ff00ea" />
+            <AntdesignIcon name="left" size={16} color="#fff" />
           </View>
         </TouchableOpacity>
 
@@ -366,13 +366,13 @@ const CustomCalendar = ({
             {MONTHS[viewMonth]} {viewYear}
           </Text>
           <View style={[styles.iconWrapper, {marginLeft: 5}]}>
-            <AntdesignIcon name="caretdown" size={9} color="#ff00ee" />
+            <AntdesignIcon name="caretdown" size={9} color="#fff" />
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
           <View style={styles.iconWrapper}>
-            <AntdesignIcon name="right" size={16} color="#ff00fb" />
+            <AntdesignIcon name="right" size={16} color="#fff" />
           </View>
         </TouchableOpacity>
       </View>
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
   navMonth: {
-    color: '#ff00ee',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -551,14 +551,14 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {paddingVertical: 8, paddingHorizontal: 20},
   cancelText: {
-    color: '#e699d5',
+    color: '#fff',
     fontWeight: '700',
     fontSize: 13,
     letterSpacing: 0.5,
   },
   okBtn: {paddingVertical: 8, paddingHorizontal: 20},
   okText: {
-    color: '#e699d5',
+    color: '#fff',
     fontWeight: '700',
     fontSize: 13,
     letterSpacing: 0.5,

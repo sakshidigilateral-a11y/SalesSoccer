@@ -15,67 +15,105 @@ import * as RNFS from 'react-native-fs';
 import DeviceInfo from 'react-native-device-info';
 import {LinearGradient} from 'react-native-linear-gradient';
 
-const API_URL = 'https://salessoccer.digilateral.com';
+const API_URL = 'http://192.168.1.7:5450';
 
 const TEAM_NAMES = [
-  'AndhraBlasters',
-  'BangaloreIndians',
-  'BhopalTitans',
-  'ChennaiSuperstars',
-  'CuttackGladiators',
-  'DelhiFighters',
-  'GujaratCommandos',
-  'GuwahatiChampions',
-  'HyderabadNawabs',
-  'KeralaRiders',
-  'KolkataInvincibles',
-  'LucknowRoyals',
-  'MumbaiRunners',
-  'NagpurLegends',
-  'PatnaKings',
-  'PuneWarriors',
-  'PunjabGiants',
-  'RaipurChallengers',
-  'RajasthanStormers',
-  'RanchiDaredevils',
+  // 'AndhraBlasters',
+  // 'BangaloreIndians',
+  // 'BhopalTitans',
+  // 'ChennaiSuperstars',
+  // 'CuttackGladiators',
+  // 'DelhiFighters',
+  // 'GujaratCommandos',
+  // 'GuwahatiChampions',
+  // 'HyderabadNawabs',
+  // 'KeralaRiders',
+  // 'KolkataInvincibles',
+  // 'LucknowRoyals',
+  // 'MumbaiRunners',
+  // 'NagpurLegends',
+  // 'PatnaKings',
+  // 'PuneWarriors',
+  // 'PunjabGiants',
+  // 'RaipurChallengers',
+  // 'RajasthanStormers',
+  // 'RanchiDaredevils',
+
+  'BANGALORECHALLENGERS',
+  'CHENNAIKINGS',
+  'ERNAKULLAMACHIEVERS',
+  'GUJARATTITANS',
+  'HUBLIHEROES',
+  'INDORETIGERS',
+  'LUCKNOWGIANTS',
+  'NAGPURBULLS',
+  'PUNERIPALTON',
+  'RAJASTHANROYALS',
+  'BURDWANBIGGIES',
+  'DELHICAPITALS',
+  'GHAZIABADYODDHA',
+  'GUWAHATIGUARDIANS',
+  'HYDERABADRISERS',
+  'KOLKATASPARTANS',
+  'MUMBAIINDIANS',
+  'PATNAPIRATES',
+  'PUNJABPANTHERS',
+  'VIJAYAWADAWARRIORS',
 ];
 
 const LOADING_MESSAGES = [
-  '⚽ Match is ready!',
-  '🏟️ Stadium is ready!',
-  '👟 Players are warming up...',
-  '📋 Setting up the lineup...',
-  '🎽 Kits are being prepared...',
-  '🏆 Trophy is polished!',
-  '📣 Fans are arriving...',
-  '🟩 Pitch is perfectly mowed!',
-  '🧤 Goalkeeper is ready!',
-  '🎯 Goal nets are up!',
-  '🚦 Referee is on the field!',
-  '📸 Cameras are rolling!',
-  '💨 Players are sprinting in!',
-  '🥅 The goals are set!',
-  '🔔 Kickoff in moments...',
+  ' Match is ready!',
+  ' Stadium is ready!',
+  ' Players are warming up...',
+  ' Setting up the lineup...',
+  ' Kits are being prepared...',
+  ' Trophy is polished!',
+  ' Fans are arriving...',
+  ' Pitch is perfectly mowed!',
+  ' Goalkeeper is ready!',
+  ' Goal nets are up!',
+  ' Referee is on the field!',
+  ' Cameras are rolling!',
+  ' Players are sprinting in!',
+  ' The goals are set!',
+  ' Kickoff in moments...',
 ];
 
 export default function AssetsDownloadPage({navigation}) {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('Preparing download...');
-  const footballAnim = useRef(new Animated.Value(0)).current;  // JS driver — drives left/width
-  const ballRotation = useRef(new Animated.Value(0)).current;  // native driver — drives rotation only
+  const footballAnim = useRef(new Animated.Value(0)).current; // JS driver — drives left/width
+  const ballRotation = useRef(new Animated.Value(0)).current; // native driver — drives rotation only
   const messageIndexRef = useRef(0);
-  const messageIntervalRef = useRef(null);
+  // const messageIntervalRef = useRef(null);
   const rotationLoopRef = useRef(null);
 
   // Rotate through fun loading messages
   useEffect(() => {
-    messageIntervalRef.current = setInterval(() => {
-      messageIndexRef.current =
-        (messageIndexRef.current + 1) % LOADING_MESSAGES.length;
-      setStatusMessage(LOADING_MESSAGES[messageIndexRef.current]);
-    }, 1800);
-    return () => clearInterval(messageIntervalRef.current);
-  }, []);
+    if (downloadProgress < 10) {
+      setStatusMessage('Match is ready!');
+    } else if (downloadProgress < 20) {
+      setStatusMessage('Stadium is ready!');
+    } else if (downloadProgress < 30) {
+      setStatusMessage(' Players are warming up...');
+    } else if (downloadProgress < 40) {
+      setStatusMessage(' Setting up the lineup...');
+    } else if (downloadProgress < 50) {
+      setStatusMessage(' Kits are being prepared...');
+    } else if (downloadProgress < 60) {
+      setStatusMessage(' Trophy is polished!');
+    } else if (downloadProgress < 70) {
+      setStatusMessage(' Fans are arriving...');
+    } else if (downloadProgress < 80) {
+      setStatusMessage('Pitch is perfectly mowed!');
+    } else if (downloadProgress < 90) {
+      setStatusMessage(' Goalkeeper is ready!');
+    } else if (downloadProgress < 100) {
+      setStatusMessage(' Kickoff in moments...');
+    } else {
+      setStatusMessage(" All set! Let's play!");
+    }
+  }, [downloadProgress]);
 
   // Continuous ball rotation
   useEffect(() => {
@@ -86,7 +124,7 @@ export default function AssetsDownloadPage({navigation}) {
           toValue: 1,
           duration: 600,
           easing: Easing.linear,
-          useNativeDriver: true,  // ✅ rotation only — safe with native driver
+          useNativeDriver: true, // ✅ rotation only — safe with native driver
         }),
       );
       rotationLoopRef.current.start();
@@ -99,11 +137,12 @@ export default function AssetsDownloadPage({navigation}) {
 
   // Keep football position in sync with downloadProgress
   useEffect(() => {
-    Animated.timing(footballAnim, {
-      toValue: downloadProgress,
-      duration: 300,
-      useNativeDriver: false,  // ✅ JS driver — needed for left/width layout props
-    }).start();
+   Animated.timing(footballAnim, {
+  toValue: downloadProgress,
+  duration: 800, // smoother
+  easing: Easing.out(Easing.ease),
+  useNativeDriver: false,
+}).start();
   }, [downloadProgress]);
 
   const downloadImage = async (url, folder, subfolder, fileName) => {
@@ -141,21 +180,25 @@ export default function AssetsDownloadPage({navigation}) {
       return false;
     }
   };
-
+  const downloadingRef = useRef(false);
   useEffect(() => {
     const startDownload = async () => {
+       if (downloadingRef.current) return;
+        downloadingRef.current = true;
       try {
         const baseUrl = `${API_URL}/DIGI`;
         const localBasePath = `${RNFS.DocumentDirectoryPath}/DIGI`;
 
-       const teamName = await AsyncStorage.getItem('teamName');
-const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName}`);
+        const teamName = await AsyncStorage.getItem('teamName');
+        const assetsDownloaded = await AsyncStorage.getItem(
+          `assetsDownloaded_${teamName}`,
+        );
 
         if (assetsDownloaded === 'true' && (await RNFS.exists(localBasePath))) {
           console.log('✅ Assets already exist');
           setDownloadProgress(100);
           setStatusMessage('🎉 Assets already downloaded!');
-          setTimeout(() => navigation.replace('Home'), 500);
+          setTimeout(() => navigation.replace('Maintabs'), 500);
           return;
         }
 
@@ -187,13 +230,15 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
           setDownloadProgress(progress);
           console.log(`Progress: ${progress.toFixed(0)}%`);
         }
-
-        console.log(`🎉 Download complete! Downloaded ${downloadedCount}/${totalFiles}`);
+      
+        console.log(
+          `🎉 Download complete! Downloaded ${downloadedCount}/${totalFiles}`,
+        );
         setDownloadProgress(100);
-        clearInterval(messageIntervalRef.current);
-        setStatusMessage("🏆 All set! Let's play!");
+        // clearInterval(messageIntervalRef.current);
+        setStatusMessage(" All set! Let's play!");
 
-       await AsyncStorage.setItem(`assetsDownloaded_${teamName}`, 'true');
+        await AsyncStorage.setItem(`assetsDownloaded_${teamName}`, 'true');
 
         setTimeout(() => {
           navigation.replace('Maintabs');
@@ -202,20 +247,20 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
         console.error('Download failed:', error);
         setStatusMessage('❌ Download failed. Retrying...');
         setTimeout(() => {
-          navigation.replace('AssetsDownload');
+          //  navigation.replace('AssetsDownload');
         }, 2000);
       }
     };
 
     startDownload();
-  }, [navigation]);
+  }, []);
 
   const TRACK_WIDTH = 250;
-  const BALL_SIZE = 36;
+  const BALL_SIZE = 32;
 
   const ballLeft = footballAnim.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, TRACK_WIDTH - BALL_SIZE],
+   outputRange: [0, TRACK_WIDTH - BALL_SIZE + 6],
     extrapolate: 'clamp',
   });
 
@@ -251,12 +296,11 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
             alignSelf: 'center',
             marginBottom: 80,
           }}>
-
           {/* Fun loading message */}
           <Text
             style={{
               color: 'white',
-              marginBottom: 14,
+              marginBottom: 6,
               fontSize: 14,
               fontWeight: '600',
               textAlign: 'center',
@@ -274,7 +318,6 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
               height: 44,
               justifyContent: 'center',
             }}>
-
             {/* Track shell — pink border */}
             <View
               style={{
@@ -287,13 +330,12 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
                 overflow: 'hidden',
                 justifyContent: 'center',
               }}>
-
               {/* Purple-to-pink gradient fill */}
               <Animated.View
                 style={{
                   position: 'absolute',
                   left: 0,
-                  top: 0,
+                  top: 4,
                   bottom: 0,
                   width: fillWidth,
                   borderRadius: 8,
@@ -323,12 +365,11 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
               ))}
             </View>
 
-            {/* Outer view handles LEFT position — JS driver */}
             <Animated.View
               style={{
                 position: 'absolute',
                 left: ballLeft,
-                top: 0,
+               top: 6,
                 width: BALL_SIZE,
                 height: BALL_SIZE,
                 justifyContent: 'center',
@@ -339,7 +380,7 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
                 style={{
                   transform: [{rotate: rotateDeg}],
                 }}>
-                <Text style={{fontSize: 28}}>⚽</Text>
+                <Text style={{fontSize: 28, opacity: 8}}>⚽</Text>
               </Animated.View>
             </Animated.View>
           </View>
@@ -349,13 +390,12 @@ const assetsDownloaded = await AsyncStorage.getItem(`assetsDownloaded_${teamName
             style={{
               color: 'rgba(255,255,255,0.85)',
               fontSize: 13,
-              marginTop: 8,
+              marginTop: 2,
               fontWeight: '700',
               letterSpacing: 1,
             }}>
             {downloadProgress.toFixed(0)}%
           </Text>
-
         </SafeAreaView>
       </View>
     </ImageBackground>

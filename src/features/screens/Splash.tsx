@@ -1,13 +1,24 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import FastImage from 'react-native-fast-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SplashScreen = ({ navigation }: any) => {
-  useEffect(() => {
+ useEffect(() => {
+  const checkAuth = async () => {
+    const token = await AsyncStorage.getItem('userToken');
+
     setTimeout(() => {
-      navigation.replace('Login');
-    }, 2000);
-  }, []);
+      if (token) {
+        navigation.replace('Login'); 
+      } else {
+        navigation.replace('Login');
+      }
+    }, 1500);
+  };
+
+  checkAuth();
+}, []);
 
   return (
     <View style={styles.container}>
